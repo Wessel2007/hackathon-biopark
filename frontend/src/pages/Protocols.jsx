@@ -1,0 +1,169 @@
+import { useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { getProtocols, createProtocol, updateProtocol, deleteProtocol, runSingleQuery, importSpreadsheet } from '../services/api'
+import { Plus, Upload, RefreshCw, Pencil, Trash2, ArrowLeft } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+
+const EMPTY_FORM = {
+  status: 'PENDENTE', projeto: '', protocolo: '', atividade: '',
+  orgao_site_consultado: '', atribuido_a: '', data_abertura: '',
+  data_finalizacao: '', situacao: '', anotacoes: '', ativo: true, url_consulta: '',
+}
+
+export default function Protocols() {
+  const navigate = useNavigate()
+  const qc = useQueryClient()
+  const [showForm, setShowForm] = useState(false)
+  const [editItem, setEditItem] = useState(null)
+  const [form, setForm] = useState(EMPTY_FORM)
+  const [filterProjeto, setFilterProjeto] = useState('')
+
+  const { data = [], isLoading } = useQuery({
+    queryKey: ['protocols', filterProjeto],
+    queryFn: () => getProtocols(filterProjeto ? { projeto: filterProjeto } : {}),
+  })
+
+  const saveMut = useMutation({
+    mutationFn: (d) => editItem ? updateProtocol(editItem.id, d) : createProtocol(d),
+    onSuccess: () => { qc.invalidateQueries(['protocols']); setShowForm(false); setEditItem(null); setForm(EMPTY_FORM) },
+  })
+
+  const delMut = useMutation({
+    mutationFn: (id) => deleteProtocol(id),
+    onSuccess: () => qc.invalidateQueries(['protocols']),
+  })
+
+  const queryMut = useMutation({
+    mutationFn: (id) => runSingleQuery(id),
+    onSuccess: () => qc.invalidateQueries(['protocols']),
+  })
+
+  function openEdit(item) {
+    setEditItem(item)
+    setForm({
+      ...item,
+      data_abertura: item.data_abertura?.slice(0, 10) ?? '',
+      data_finalizacao: item.data_finalizacao?.slice(0, 10) ?? '',
+    })
+    setShowForm(true)
+  }
+
+  async function handleImport(e) {
+    const file = e.target.files[0]
+    if (!file) return
+    const result = await importSpreadsheet(file)
+    alert(`Importados: ${result.importados?.length ?? 0} | Ignorados: ${result.ignorados?.length ?? 0} | Erros: ${result.erros?.length ?? 0}`)
+    qc.invalidateQueries(['protocols'])
+  }
+
+  const campos = [
+    ['status', 'Status'], ['projeto', 'Projeto'], ['protocolo', 'Protocolo'],
+    ['atividade', 'Atividade'], ['orgao_site_consultado', 'Órgão / Site'],
+    ['atribuido_a', 'Atribuído a'], ['data_abertura', 'Data Abertura'],
+    ['data_finalizacao', 'Data Finalização'], ['situacao', 'Situação'],
+    ['url_consulta', 'URL Consulta'], ['anotacoes', 'Anotações'],
+  ]
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <nav className="bg-brand-900 text-white px-6 py-4 flex justify-between items-center">
+        <button onClick={() => navigate('/')} className="flex items-center gap-2 hover:underline text-sm">
+          <ArrowLeft size={14} /> Dashboard
+        </button>
+        <h1 className="text-lg font-bold">Protocolos</h1>
+        <div className="flex gap-2">
+          <label className="flex items-center gap-1 cursor-pointer bg-white/10 px-3 py-1.5 rounded text-sm hover:bg-white/20">
+            <Upload size={14} /> Importar Planilha
+            <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport} />
+          </label>
+          <button onClick={() => { setShowForm(true); setEditItem(null); setForm(EMPTY_FORM) }}
+            className="flex items-center gap-1 bg-brand-500 px-3 py-1.5 rounded text-sm hover:bg-brand-700">
+            <Plus size={14} /> Novo
+          </button>
+        </div>
+      </nav>
+
+      <div className="max-w-7xl mx-auto p-6 space-y-4">
+        <input
+          placeholder="Filtrar por projeto..."
+          value={filterProjeto}
+          onChange={(e) => setFilterProjeto(e.target.value)}
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-brand-500"
+        />
+
+        {showForm && (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-screen overflow-y-auto p-6">
+              <h2 className="text-lg font-semibold mb-4">{editItem ? 'Editar Protocolo' : 'Novo Protocolo'}</h2>
+              <div className="grid grid-cols-2 gap-3">
+                {campos.map(([key, label]) => (
+                  <div key={key} className={key === 'anotacoes' ? 'col-span-2' : ''}>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
+                    {key === 'anotacoes' ? (
+                      <textarea rows={2} value={form[key] ?? ''} onChange={(e) => setForm(f => ({ ...f, [key]: e.target.value }))}
+                        className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500" />
+                    ) : (
+                      <input type={key.startsWith('data') ? 'date' : 'text'} value={form[key] ?? ''}
+                        onChange={(e) => setForm(f => ({ ...f, [key]: e.target.value }))}
+                        className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500" />
+                    )}
+                  </div>
+                ))}
+                <div className="flex items-center gap-2 col-span-2">
+                  <input type="checkbox" id="ativo" checked={form.ativo} onChange={(e) => setForm(f => ({ ...f, ativo: e.target.checked }))} />
+                  <label htmlFor="ativo" className="text-sm">Ativo</label>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 mt-4">
+                <button onClick={() => { setShowForm(false); setEditItem(null) }} className="text-sm px-4 py-2 border rounded-lg hover:bg-gray-50">Cancelar</button>
+                <button onClick={() => saveMut.mutate(form)} disabled={saveMut.isPending}
+                  className="text-sm px-4 py-2 bg-brand-700 text-white rounded-lg hover:bg-brand-900 disabled:opacity-50">
+                  {saveMut.isPending ? 'Salvando...' : 'Salvar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isLoading ? <p className="text-gray-500">Carregando...</p> : (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="text-xs text-gray-500 bg-gray-50 border-b">
+                <tr>
+                  {['Projeto', 'Protocolo', 'Atividade', 'Órgão', 'Status', 'Situação', 'Ativo', 'Duração', 'Ações'].map(h => (
+                    <th key={h} className="text-left px-3 py-2">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.map((p) => (
+                  <tr key={p.id} className="border-t border-gray-50 hover:bg-gray-50">
+                    <td className="px-3 py-2 font-medium">{p.projeto}</td>
+                    <td className="px-3 py-2 font-mono text-xs">{p.protocolo}</td>
+                    <td className="px-3 py-2 text-gray-600 max-w-32 truncate">{p.atividade}</td>
+                    <td className="px-3 py-2 text-gray-500 text-xs max-w-28 truncate">{p.orgao_site_consultado}</td>
+                    <td className="px-3 py-2"><span className="bg-brand-50 text-brand-900 text-xs px-2 py-0.5 rounded-full">{p.status}</span></td>
+                    <td className="px-3 py-2 text-gray-500 text-xs">{p.situacao ?? '-'}</td>
+                    <td className="px-3 py-2">{p.ativo ? '✅' : '❌'}</td>
+                    <td className="px-3 py-2">{p.duracao_dias ?? '-'}d</td>
+                    <td className="px-3 py-2 flex gap-1">
+                      <button onClick={() => queryMut.mutate(p.id)} title="Consultar" className="p-1 text-brand-700 hover:bg-brand-50 rounded">
+                        <RefreshCw size={13} />
+                      </button>
+                      <button onClick={() => openEdit(p)} title="Editar" className="p-1 text-gray-600 hover:bg-gray-100 rounded">
+                        <Pencil size={13} />
+                      </button>
+                      <button onClick={() => { if (confirm('Remover/inativar?')) delMut.mutate(p.id) }} title="Remover" className="p-1 text-red-500 hover:bg-red-50 rounded">
+                        <Trash2 size={13} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
