@@ -148,7 +148,7 @@ export default function Dashboard() {
   })
 
   /* ─── handlers ─── */
-  function handleLogout() { localStorage.removeItem('token'); navigate('/login') }
+  function handleLogout() { localStorage.removeItem('token'); localStorage.removeItem('reports_token'); navigate('/login') }
   async function handleRunAll() {
     await runAllQueries()
     setTimeout(() => invalidateAll(), 3000)
