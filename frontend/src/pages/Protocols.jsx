@@ -32,6 +32,15 @@ export default function Protocols() {
   const [showBulkConfirm, setShowBulkConfirm] = useState(false)
   const [queryResult, setQueryResult] = useState(null)
 
+  function buildParams() {
+    const p = {}
+    if (filters.projeto) p.projeto = filters.projeto
+    if (filters.protocolo) p.protocolo = filters.protocolo
+    if (filters.status) p.status = filters.status
+    if (filters.ativo !== '') p.ativo = filters.ativo === 'true'
+    return p
+  }
+
   const { data = [], isLoading } = useQuery({
     queryKey: ['protocols'],
     queryFn: () => getProtocols({}),

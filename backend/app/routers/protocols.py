@@ -24,8 +24,10 @@ def _add_duracao(p: dict) -> dict:
 @router.get("/")
 def list_protocols(
     projeto: Optional[str] = Query(None),
+    protocolo: Optional[str] = Query(None),
     ativo: Optional[bool] = Query(None),
     status: Optional[str] = Query(None),
+    situacao: Optional[str] = Query(None),
     skip: int = 0,
     limit: int = 100,
     sb: SupabaseClient = Depends(get_supabase),
@@ -34,10 +36,14 @@ def list_protocols(
     q = sb.table("protocols").select("*, query_history(*)")
     if projeto:
         q = q.ilike("projeto", f"%{projeto}%")
+    if protocolo:
+        q = q.ilike("protocolo", f"%{protocolo}%")
     if ativo is not None:
         q = q.eq("ativo", ativo)
     if status:
         q = q.eq("status", status)
+    if situacao:
+        q = q.ilike("situacao", f"%{situacao}%")
     result = q.range(skip, skip + limit - 1).order("projeto").execute()
     return [_add_duracao(p) for p in result.data]
 
