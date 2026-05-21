@@ -64,7 +64,7 @@ export default function Dashboard() {
   const [queryResult,     setQueryResult]     = useState(null)
 
   /* ─── queries ─── */
-  const { data: dashData, refetch: refetchDash } = useQuery({
+  const { data: dashData } = useQuery({
     queryKey: ['dashboard'], queryFn: getDashboardData,
   })
   const { data: protocols = [], isLoading } = useQuery({
@@ -101,10 +101,17 @@ export default function Dashboard() {
   const mudancasHoje = (dashData?.com_mudanca_recente ?? 0)
 
   /* ─── mutations ─── */
+  function invalidateAll() {
+    return Promise.all([
+      qc.invalidateQueries({ queryKey: ['protocols'] }),
+      qc.invalidateQueries({ queryKey: ['dashboard'] }),
+    ])
+  }
+
   const saveMut = useMutation({
     mutationFn: (d) => editItem ? updateProtocol(editItem.id, d) : createProtocol(d),
-    onSuccess: () => {
-      qc.invalidateQueries(['protocols']); qc.invalidateQueries(['dashboard'])
+    onSuccess: async () => {
+      await invalidateAll()
       setShowForm(false); setEditItem(null); setForm(EMPTY_FORM); setFormError(null)
     },
     onError: (err) => {
@@ -115,7 +122,7 @@ export default function Dashboard() {
 
   const delMut = useMutation({
     mutationFn: (id) => deleteProtocol(id),
-    onSuccess: () => { qc.invalidateQueries(['protocols']); qc.invalidateQueries(['dashboard']); setPageError(null) },
+    onSuccess: async () => { await invalidateAll(); setPageError(null) },
     onError: (err) => {
       const msg = err.response?.data?.detail || err.message || 'Erro ao excluir'
       setPageError(typeof msg === 'object' ? JSON.stringify(msg) : msg)
@@ -124,13 +131,13 @@ export default function Dashboard() {
 
   const queryMut = useMutation({
     mutationFn: (id) => runSingleQuery(id),
-    onSuccess: (res) => { qc.invalidateQueries(['protocols']); qc.invalidateQueries(['dashboard']); setQueryResult(res) },
+    onSuccess: async (res) => { await invalidateAll(); setQueryResult(res) },
   })
 
   const bulkDelMut = useMutation({
     mutationFn: (force) => bulkDeleteProtocols([...selected], force),
-    onSuccess: () => {
-      qc.invalidateQueries(['protocols']); qc.invalidateQueries(['dashboard'])
+    onSuccess: async () => {
+      await invalidateAll()
       setSelected(new Set()); setShowBulkConfirm(false)
     },
     onError: (err) => {
@@ -144,7 +151,7 @@ export default function Dashboard() {
   function handleLogout() { localStorage.removeItem('token'); navigate('/login') }
   async function handleRunAll() {
     await runAllQueries()
-    setTimeout(() => { refetchDash(); qc.invalidateQueries(['protocols']) }, 3000)
+    setTimeout(() => invalidateAll(), 3000)
   }
 
   function handleSave() {
