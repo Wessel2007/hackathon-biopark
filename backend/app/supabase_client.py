@@ -92,14 +92,9 @@ class SupabaseTable:
 
     def execute(self):
         headers = HEADERS.copy()
+        params = self._params
 
-        # Para INSERT/UPDATE: pede representação completa incluindo todos os campos
-        if self._method in ("POST", "PATCH"):
-            params = {**self._params, "select": "*"}
-        else:
-            params = self._params
-
-        with httpx.Client(timeout=20) as client:
+        with httpx.Client(timeout=30) as client:
             if self._method == "GET":
                 r = client.get(self._url, headers=headers, params=params)
             elif self._method == "POST":
@@ -107,9 +102,19 @@ class SupabaseTable:
             elif self._method == "PATCH":
                 r = client.patch(self._url, headers=headers, params=params, json=self._data)
             elif self._method == "DELETE":
-                r = client.delete(self._url, headers=headers, params=self._params)
+                r = client.delete(self._url, headers=headers, params=params)
 
-        r.raise_for_status()
+        if not r.is_success:
+            try:
+                detail = r.json()
+            except Exception:
+                detail = r.text
+            raise httpx.HTTPStatusError(
+                f"{r.status_code} {r.reason_phrase} — {detail}",
+                request=r.request,
+                response=r,
+            )
+
         body = r.json() if r.content else []
 
         # maybe_single(): retorna primeiro elemento ou None (sem usar Accept header
