@@ -3,11 +3,11 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
-from supabase import Client
+from app.supabase_client import SupabaseClient
 import io
 
 
-def generate_pdf_report(sb: Client) -> bytes:
+def generate_pdf_report(sb: SupabaseClient) -> bytes:
     protocols = sb.table("protocols").select("*, query_history(*)").order("projeto").execute().data
 
     buffer = io.BytesIO()

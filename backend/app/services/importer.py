@@ -3,7 +3,8 @@ from datetime import datetime, date
 
 import openpyxl
 import pandas as pd
-from supabase import Client
+
+from app.supabase_client import SupabaseClient
 
 SKIP_SHEETS = {"Configuração"}
 
@@ -355,46 +356,68 @@ def parse_spreadsheet(file_buffer) -> dict:
     return {"rows": registros, "ignorados": ignorados, "erros": erros}
 
 
-def _inserir_rows(rows: list, sb: Client):
+def _inserir_rows(rows: list, sb: SupabaseClient):
     """
-    Revalida, checa duplicidade (projeto + protocolo + órgão) e insere cada linha.
-    Nunca lança exceção — erros por linha vão para a lista de erros.
+    Revalida, checa duplicidade (projeto + protocolo + órgão) e insere em lote.
+    Usa 2 requests ao banco independente do número de linhas:
+    1 SELECT para buscar existentes, 1 INSERT em lote com os novos.
     """
     imported, ignorados, erros = [], [], []
 
+    # Passo 1: validar todos os registros em memória
+    payloads_validos: list[tuple[str, dict]] = []
     for reg in rows:
         linha = reg.get("linha", "?")
-        try:
-            payload, erro_validacao = _revalidar_payload(reg)
-            if erro_validacao:
-                ignorados.append({"linha": linha, "motivo": erro_validacao})
-                continue
+        payload, erro_validacao = _revalidar_payload(reg)
+        if erro_validacao:
+            ignorados.append({"linha": linha, "motivo": erro_validacao})
+        else:
+            payloads_validos.append((linha, payload))
 
-            projeto = payload["projeto"]
-            protocolo = payload["protocolo"]
-            orgao = payload.get("orgao_site_consultado") or ""
+    if not payloads_validos:
+        return imported, ignorados, erros
 
-            existing = (
-                sb.table("protocols")
-                .select("id")
-                .eq("projeto", projeto)
-                .eq("protocolo", protocolo)
-                .eq("orgao_site_consultado", orgao)
-                .execute()
-            )
-            if existing.data:
-                ignorados.append({"linha": linha, "motivo": "Duplicata ignorada"})
-                continue
+    # Passo 2: buscar todos os protocolos existentes em uma única query
+    try:
+        existing_raw = (
+            sb.table("protocols")
+            .select("projeto,protocolo,orgao_site_consultado")
+            .execute()
+        )
+        existing = {
+            (r["projeto"], r["protocolo"], r.get("orgao_site_consultado") or "")
+            for r in (existing_raw.data or [])
+        }
+    except Exception as e:
+        erros.append({"linha": "dedup-check", "erro": f"Erro ao verificar duplicatas: {str(e)}"})
+        return imported, ignorados, erros
 
-            sb.table("protocols").insert(payload).execute()
-            imported.append({"linha": linha, "protocolo": protocolo, "projeto": projeto})
-        except Exception as e:
-            erros.append({"linha": linha, "erro": str(e)})
+    # Passo 3: filtrar duplicatas em memória
+    to_insert: list[tuple[str, dict]] = []
+    for linha, payload in payloads_validos:
+        key = (payload["projeto"], payload["protocolo"], payload.get("orgao_site_consultado") or "")
+        if key in existing:
+            ignorados.append({"linha": linha, "motivo": "Duplicata ignorada"})
+        else:
+            to_insert.append((linha, payload))
+
+    if not to_insert:
+        return imported, ignorados, erros
+
+    # Passo 4: insert em lote em uma única request
+    try:
+        sb.table("protocols").insert([p for _, p in to_insert]).execute()
+        imported = [
+            {"linha": linha, "protocolo": p["protocolo"], "projeto": p["projeto"]}
+            for linha, p in to_insert
+        ]
+    except Exception as e:
+        erros.append({"linha": "bulk-insert", "erro": f"Erro no insert em lote: {str(e)}"})
 
     return imported, ignorados, erros
 
 
-def import_spreadsheet(file_buffer, sb: Client) -> dict:
+def import_spreadsheet(file_buffer, sb: SupabaseClient) -> dict:
     """Parse + insere em uma etapa só (endpoint legado /spreadsheet)."""
     parsed = parse_spreadsheet(file_buffer)
     if "error" in parsed:
@@ -408,7 +431,7 @@ def import_spreadsheet(file_buffer, sb: Client) -> dict:
     }
 
 
-def confirm_import(rows: list, sb: Client) -> dict:
+def confirm_import(rows: list, sb: SupabaseClient) -> dict:
     """Revalida e insere as linhas enviadas pelo frontend após o preview."""
     imported, ignorados, erros = _inserir_rows(rows, sb)
     return {"importados": imported, "ignorados": ignorados, "erros": erros}

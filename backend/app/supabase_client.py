@@ -36,7 +36,7 @@ class SupabaseTable:
         c._method = "GET"
         return c
 
-    def insert(self, data: dict):
+    def insert(self, data: dict | list):
         c = self._clone()
         c._data = data
         c._method = "POST"

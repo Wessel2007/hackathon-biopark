@@ -4,11 +4,10 @@ import io
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
-from supabase import Client
 
 from app.routers.deps import get_current_user
 from app.services.importer import confirm_import, import_spreadsheet, parse_spreadsheet
-from app.supabase_client import get_supabase
+from app.supabase_client import SupabaseClient, get_supabase
 
 router = APIRouter(prefix="/import", tags=["import"])
 
@@ -38,7 +37,7 @@ class ConfirmBody(BaseModel):
 @router.post("/confirm")
 def confirm_excel(
     body: ConfirmBody,
-    sb: Client = Depends(get_supabase),
+    sb: SupabaseClient = Depends(get_supabase),
     _: str = Depends(get_current_user),
 ):
     """Recebe as linhas validadas do preview e as insere no banco."""
@@ -48,7 +47,7 @@ def confirm_excel(
 @router.post("/spreadsheet")
 def import_excel(
     file: UploadFile = File(...),
-    sb: Client = Depends(get_supabase),
+    sb: SupabaseClient = Depends(get_supabase),
     _: str = Depends(get_current_user),
 ):
     """Importação direta sem preview (mantido para compatibilidade)."""

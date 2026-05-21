@@ -2,11 +2,7 @@ from datetime import datetime, timezone, timedelta
 import random
 import re
 import json
-import time
-from html import unescape
-
-import httpx
-from bs4 import BeautifulSoup
+import unicodedata
 
 from app.supabase_client import SupabaseClient
 from app.services.email_service import enviar_alerta
@@ -19,7 +15,6 @@ from app.services.email_service import enviar_alerta
 _ORGAN_STATUSES: dict[str, list[str]] = {
     "prefeitura": ["EM ANÁLISE", "APROVADO", "AGUARDANDO DOCUMENTAÇÃO"],
     "copel":      ["EM ANÁLISE", "AGUARDANDO VISTORIA", "APROVADO"],
-    "cartório":   ["EM ANÁLISE", "REGISTRADO", "CANCELADO"],
     "cartorio":   ["EM ANÁLISE", "REGISTRADO", "CANCELADO"],
 }
 
@@ -34,11 +29,6 @@ _ORGAN_OBSERVATIONS: dict[str, dict[str, str]] = {
         "AGUARDANDO VISTORIA":"Aguardando agendamento de vistoria presencial no local da obra.",
         "APROVADO":           "Conexão aprovada. Entrar em contato para agendamento da ligação.",
     },
-    "cartório": {
-        "EM ANÁLISE": "Documentação em análise pelo registrador.",
-        "REGISTRADO": "Registro efetivado. Certidão disponível para retirada.",
-        "CANCELADO":  "Pedido cancelado a pedido do requerente ou por ausência de requisitos.",
-    },
     "cartorio": {
         "EM ANÁLISE": "Documentação em análise pelo registrador.",
         "REGISTRADO": "Registro efetivado. Certidão disponível para retirada.",
@@ -47,10 +37,14 @@ _ORGAN_OBSERVATIONS: dict[str, dict[str, str]] = {
 }
 
 
+def _normalize(s: str) -> str:
+    return unicodedata.normalize("NFD", s).encode("ascii", "ignore").decode("ascii").lower()
+
+
 def _organ_key(orgao: str) -> str:
-    lower = orgao.lower()
+    normalized = _normalize(orgao)
     for key in _ORGAN_STATUSES:
-        if key in lower:
+        if key in normalized:
             return key
     return "outros"
 
@@ -101,6 +95,15 @@ def _mock_query(p: dict) -> dict:
         "fonte_consulta":      f"SIMULADO: {orgao}",
         "erro":                None,
     }
+
+
+def _is_cartorios_pr_query(p: dict) -> bool:
+    orgao = _normalize(p.get("orgao_site_consultado") or "")
+    return "cartorio" in orgao
+
+
+def _query_cartorios_pr_toledo(p: dict) -> dict:
+    return _mock_query(p)
 
 
 def _query_source(p: dict) -> dict:
