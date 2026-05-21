@@ -4,7 +4,6 @@
 
 - **Python** 3.10 ou superior
 - **Node.js** 18 ou superior (com npm)
-- Uma conta no **Supabase** (banco de dados PostgreSQL gratuito)
 
 ---
 
@@ -17,57 +16,20 @@ cd hackathon-biopark
 
 ---
 
-## 2. Configurar o Supabase
+## 2. Backend (FastAPI)
 
-1. Acesse [supabase.com](https://supabase.com) e crie um projeto.
-2. Vá em **Settings → Database** e copie a **Connection String** (URI).
-3. Vá em **Settings → API** e copie a **Project URL** e a **anon key**.
-
-Você vai precisar dessas informações nos passos seguintes.
-
----
-
-## 3. Backend (FastAPI)
-
-### 3.1 Instalar dependências
+### 2.1 Instalar dependências
 
 ```bash
 cd backend
 pip install -r requirements.txt
 ```
 
-### 3.2 Configurar variáveis de ambiente
+### 2.2 Configurar variáveis de ambiente
 
-```bash
-# Windows (PowerShell)
-Copy-Item .env.example .env
+Peça o arquivo `.env` com as credenciais do projeto para um membro da equipe e coloque-o em `backend/.env`.
 
-# Linux/macOS
-cp .env.example .env
-```
-
-Abra o arquivo `.env` e preencha os campos:
-
-```env
-# Cole a connection string do Supabase (Settings → Database → URI)
-DATABASE_URL=postgresql://postgres:[SENHA]@db.[PROJECT_REF].supabase.co:5432/postgres
-
-# Qualquer string aleatória longa e segura
-SECRET_KEY=troque-por-uma-chave-secreta-forte-aqui
-
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=480
-
-# Credenciais de acesso ao dashboard
-DASHBOARD_EMAIL=admin@biopark.com.br
-DASHBOARD_PASSWORD=biopark2025
-
-# Dados do Supabase (Settings → API)
-SUPABASE_URL=https://[PROJECT_REF].supabase.co
-SUPABASE_ANON_KEY=sua-anon-key-aqui
-```
-
-### 3.3 Subir o servidor
+### 2.3 Subir o servidor
 
 ```bash
 uvicorn app.main:app --reload
@@ -79,18 +41,18 @@ O backend estará disponível em:
 
 ---
 
-## 4. Frontend (React + Vite)
+## 3. Frontend (React + Vite)
 
 Abra um novo terminal:
 
-### 4.1 Instalar dependências
+### 3.1 Instalar dependências
 
 ```bash
 cd frontend
 npm install
 ```
 
-### 4.2 Configurar variáveis de ambiente
+### 3.2 Configurar variáveis de ambiente
 
 ```bash
 # Windows (PowerShell)
@@ -106,7 +68,7 @@ Abra o arquivo `.env` e aponte para o backend local:
 VITE_API_URL=http://localhost:8000
 ```
 
-### 4.3 Subir o servidor de desenvolvimento
+### 3.3 Subir o servidor de desenvolvimento
 
 ```bash
 npm run dev
@@ -116,7 +78,7 @@ O frontend estará disponível em: **http://localhost:5173**
 
 ---
 
-## 5. Acessar o sistema
+## 4. Acessar o sistema
 
 Abra o navegador em http://localhost:5173 e faça login com as credenciais configuradas no `.env` do backend:
 
@@ -127,7 +89,7 @@ Abra o navegador em http://localhost:5173 e faça login com as credenciais confi
 
 ---
 
-## 6. Importar dados iniciais (opcional)
+## 5. Importar dados iniciais (opcional)
 
 Para carregar os protocolos da planilha inicial:
 
