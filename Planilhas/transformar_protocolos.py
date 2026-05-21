@@ -15,7 +15,7 @@ SKIP_SHEETS = {"Configuração"}
 STATUS_MAP = {
     "CANC": "CANCELADO",
     "ANÁL": "EM ANDAMENTO",
-    "ANÁL": "EM ANDAMENTO",
+    "APRO": "APROVADO",
 }
 
 def normaliza_status(s):

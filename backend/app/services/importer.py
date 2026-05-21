@@ -31,6 +31,7 @@ def _normaliza_status(s):
     if not s:
         return ""
     s = str(s).strip().upper()
+    s = re.sub(r"[.\s]+$", "", s)
     return STATUS_MAP.get(s, s)
 
 
@@ -118,6 +119,8 @@ def _revalidar_payload(reg: dict):
 
     for campo in _CAMPOS_OBRIGATORIOS:
         val = str(reg.get(campo, "") or "").strip()
+        if campo == "status":
+            val = _normaliza_status(val)
         if not val:
             return None, f"Campo obrigatório ausente: {campo}"
         payload[campo] = val
@@ -257,7 +260,7 @@ def _processar_carga_inicial(file_buffer):
     for i, row in df.iterrows():
         linha = f"Carga Inicial:{i + 5}"
         try:
-            status = str(row.get("status", "")).strip()
+            status = _normaliza_status(row.get("status", ""))
             projeto = str(row.get("projeto", "")).strip()
             protocolo = str(row.get("protocolo", "")).strip()
             atividade = str(row.get("atividade", "")).strip()
