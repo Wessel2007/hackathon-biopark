@@ -237,7 +237,7 @@ export default function Dashboard() {
           </div>
           <nav className="hidden sm:flex items-center gap-1 text-sm">
             <button className="px-3 py-1.5 rounded-lg font-medium bg-paper text-ink">Protocolos</button>
-            <button onClick={() => navigate('/reports')} className="px-3 py-1.5 rounded-lg text-muted hover:text-ink hover:bg-paper transition">Relatórios</button>
+            <button onClick={() => { localStorage.removeItem('reports_token'); navigate('/reports-login') }} className="px-3 py-1.5 rounded-lg text-muted hover:text-ink hover:bg-paper transition">Relatórios</button>
           </nav>
         </div>
         <div className="flex items-center gap-2">

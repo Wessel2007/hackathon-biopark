@@ -57,7 +57,7 @@ export default function Reports() {
       {/* ═══ NAVBAR ═══ */}
       <header className="sticky top-0 z-30 h-14 flex items-center justify-between px-6 bg-surface border-b border-line">
         <div className="flex items-center gap-4">
-          <button onClick={() => navigate('/')} className="w-9 h-9 rounded-lg flex items-center justify-center bg-paper hover:bg-line transition text-ink">
+          <button onClick={() => { localStorage.removeItem('reports_token'); navigate('/') }} className="w-9 h-9 rounded-lg flex items-center justify-center bg-paper hover:bg-line transition text-ink">
             <ArrowLeft size={16} />
           </button>
           <div className="flex items-center gap-2.5">
@@ -66,7 +66,7 @@ export default function Reports() {
             <span className="hidden sm:inline text-[10px] font-mono px-1.5 py-0.5 rounded bg-paper text-muted uppercase tracking-wider">Pro</span>
           </div>
           <nav className="hidden sm:flex items-center gap-1 text-sm ml-2">
-            <button onClick={() => navigate('/')} className="px-3 py-1.5 rounded-lg text-muted hover:text-ink hover:bg-paper transition">Protocolos</button>
+            <button onClick={() => { localStorage.removeItem('reports_token'); navigate('/') }} className="px-3 py-1.5 rounded-lg text-muted hover:text-ink hover:bg-paper transition">Protocolos</button>
             <button className="px-3 py-1.5 rounded-lg font-medium bg-paper text-ink">Relatórios</button>
           </nav>
         </div>
