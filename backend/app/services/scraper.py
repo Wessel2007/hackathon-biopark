@@ -222,10 +222,10 @@ def _parse_cartorio_result(html: str, protocolo: str) -> tuple:
     return status, obs, data_mov
 
 
-async def _async_playwright_query(protocolo: str, orgao: str, url_salva: str) -> dict:
-    """Lógica do scraper usando async_playwright (executa em thread dedicada)."""
+def _sync_playwright_query(protocolo: str, orgao: str, url_salva: str) -> dict:
+    """Lógica do scraper usando sync_playwright (seguro em thread, sem asyncio)."""
     try:
-        from playwright.async_api import async_playwright, TimeoutError as PWTimeout
+        from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
     except ImportError:
         return {"erro": "Playwright não instalado.", "screenshot_base64": None}
 
@@ -234,60 +234,60 @@ async def _async_playwright_query(protocolo: str, orgao: str, url_salva: str) ->
 
     nav_url = url_salva if (url_salva and "cartoriospr" in url_salva) else f"{_CARTORIOS_PR_URL}{protocolo}"
 
-    async with async_playwright() as pw:
-        browser = await pw.chromium.launch(
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch(
             headless=True,
             args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
         )
-        ctx = await browser.new_context(
+        ctx = browser.new_context(
             viewport={"width": 1280, "height": 900},
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
         )
-        page = await ctx.new_page()
+        page = ctx.new_page()
 
         # ── Navegação ──────────────────────────────────────────────────────
-        await page.goto(nav_url, wait_until="domcontentloaded", timeout=30000)
+        page.goto(nav_url, wait_until="domcontentloaded", timeout=30000)
         try:
-            await page.wait_for_load_state("networkidle", timeout=10000)
+            page.wait_for_load_state("networkidle", timeout=10000)
         except PWTimeout:
             pass
 
         # Se cair no formulário (tem <select>), preencher manualmente
         selects = page.locator("select")
-        if await selects.count() > 0:
+        if selects.count() > 0:
             # 1. Serventia
             try:
-                await selects.first.select_option(label=serventia_label)
+                selects.first.select_option(label=serventia_label)
             except Exception:
                 try:
-                    await selects.first.select_option(label=re.compile(rf"Toledo.*{oficios}", re.I))
+                    selects.first.select_option(label=re.compile(rf"Toledo.*{oficios}", re.I))
                 except Exception:
                     pass
 
             # 2. Tipo: Protocolo de Registro/Averbações (2° radio)
             radios = page.locator("input[type='radio']")
-            if await radios.count() > 1:
+            if radios.count() > 1:
                 try:
-                    await radios.nth(1).check(force=True)
+                    radios.nth(1).check(force=True)
                 except Exception:
                     pass
 
             # 3. Número do protocolo
             for sel in ["input[type='number']", "input[type='text']"]:
                 inputs = page.locator(sel)
-                if await inputs.count() > 0:
+                if inputs.count() > 0:
                     try:
-                        await inputs.first.fill(protocolo)
+                        inputs.first.fill(protocolo)
                         break
                     except Exception:
                         pass
 
             # 4. Checkbox de termos
             checkboxes = page.locator("input[type='checkbox']")
-            for i in range(await checkboxes.count()):
+            for i in range(checkboxes.count()):
                 try:
-                    if not await checkboxes.nth(i).is_checked():
-                        await checkboxes.nth(i).check(force=True)
+                    if not checkboxes.nth(i).is_checked():
+                        checkboxes.nth(i).check(force=True)
                 except Exception:
                     pass
 
@@ -295,31 +295,31 @@ async def _async_playwright_query(protocolo: str, orgao: str, url_salva: str) ->
             clicked = False
             for btn_sel in ["button:has-text('Consultar')", "input[type='submit']", "button[type='submit']", "button"]:
                 btns = page.locator(btn_sel)
-                if await btns.count() > 0:
+                if btns.count() > 0:
                     try:
-                        await btns.last.click()
+                        btns.last.click()
                         clicked = True
                         break
                     except Exception:
                         continue
             if not clicked:
                 try:
-                    await page.locator("form").first.evaluate("f => f.submit()")
+                    page.locator("form").first.evaluate("f => f.submit()")
                 except Exception:
                     pass
 
             try:
-                await page.wait_for_load_state("networkidle", timeout=15000)
+                page.wait_for_load_state("networkidle", timeout=15000)
             except PWTimeout:
                 pass
-            await page.wait_for_timeout(1500)
+            page.wait_for_timeout(1500)
         else:
-            await page.wait_for_timeout(1000)
+            page.wait_for_timeout(1000)
 
         # ── Screenshot e parse ─────────────────────────────────────────────
-        screenshot_bytes = await page.screenshot(full_page=True)
-        html = await page.content()
-        await browser.close()
+        screenshot_bytes = page.screenshot(full_page=True)
+        html = page.content()
+        browser.close()
 
     screenshot_b64 = base64.b64encode(screenshot_bytes).decode()
     status, obs, data_mov = _parse_cartorio_result(html, protocolo)
@@ -354,12 +354,10 @@ def _query_cartorios_pr_toledo(p: dict) -> dict:
         }
 
     try:
-        # Executa em thread dedicada com event loop próprio,
-        # evitando conflito com o event loop do FastAPI/uvicorn
+        # Executa em thread dedicada para não bloquear o event loop do FastAPI/uvicorn
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
             future = executor.submit(
-                asyncio.run,
-                _async_playwright_query(protocolo, orgao, url_salva),
+                _sync_playwright_query, protocolo, orgao, url_salva,
             )
             return future.result(timeout=90)
     except Exception as exc:
