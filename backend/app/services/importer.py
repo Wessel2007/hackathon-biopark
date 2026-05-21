@@ -23,6 +23,27 @@ _CAMPOS_OBRIGATORIOS = ("status", "projeto", "protocolo", "atividade")
 _CAMPOS_TEXTO = ("orgao_site_consultado", "atribuido_a", "situacao", "url_consulta", "observacao_consulta")
 _CAMPOS_DATA = ("data_abertura", "data_finalizacao")
 
+# Limites do schema Supabase. Após rodar migration_widen_protocol_text.sql,
+# projeto/orgao passam a 500 e atividade vira TEXT (use 10000).
+_LIMITES_CAMPO = {
+    "status": 50,
+    "projeto": 500,
+    "protocolo": 100,
+    "atividade": 10000,
+    "orgao_site_consultado": 500,
+    "atribuido_a": 100,
+    "situacao": 100,
+    "url_consulta": 500,
+}
+
+# Fallback para bancos ainda com VARCHAR(200) — evita erro 22001 sem migration
+_LIMITES_CAMPO_LEGACY = {
+    **{k: v for k, v in _LIMITES_CAMPO.items()},
+    "projeto": 200,
+    "atividade": 200,
+    "orgao_site_consultado": 200,
+}
+
 
 # ---------------------------------------------------------------------------
 # Helpers de transformação
@@ -42,6 +63,32 @@ def _limpa_texto(v):
     s = str(v).strip().replace("\n", " ").replace("\r", " ")
     s = re.sub(r" {2,}", " ", s)
     return s if s else None
+
+
+def _truncar_campo(campo: str, valor: str | None, limites: dict | None = None) -> tuple[str | None, str | None]:
+    """Corta texto ao limite do banco. Retorna (valor, aviso) — aviso só se houve corte."""
+    if valor is None:
+        return None, None
+    limite = (limites or _LIMITES_CAMPO).get(campo)
+    if not limite or len(valor) <= limite:
+        return valor, None
+    return valor[:limite], f"{campo} truncado ({len(valor)} → {limite} caracteres)"
+
+
+def _aplicar_limites_payload(payload: dict, limites: dict | None = None) -> list[str]:
+    """Trunca campos de texto do payload; retorna lista de avisos."""
+    avisos = []
+    for campo in (*_CAMPOS_OBRIGATORIOS, *_CAMPOS_TEXTO):
+        if campo not in payload:
+            continue
+        val = payload.get(campo)
+        if val is None:
+            continue
+        novo, aviso = _truncar_campo(campo, str(val), limites)
+        if aviso:
+            avisos.append(aviso)
+        payload[campo] = novo if campo == "orgao_site_consultado" else (novo or None)
+    return avisos
 
 
 def _normaliza_projeto(nome: str) -> str:
@@ -155,6 +202,9 @@ def _revalidar_payload(reg: dict):
     else:
         payload["ativo"] = bool(ativo) if ativo is not None else True
 
+    avisos = _aplicar_limites_payload(payload, _LIMITES_CAMPO)
+    if avisos:
+        return payload, "; ".join(avisos)
     return payload, None
 
 
@@ -368,9 +418,14 @@ def parse_spreadsheet(file_buffer) -> dict:
     return {"rows": registros, "ignorados": ignorados, "erros": erros}
 
 
+def _chave_protocolo(payload: dict) -> tuple[str, str]:
+    """Chave única no banco: constraint uq_projeto_protocolo."""
+    return (payload["projeto"], payload["protocolo"])
+
+
 def _inserir_rows(rows: list, sb: SupabaseClient):
     """
-    Revalida, checa duplicidade (projeto + protocolo + órgão) e insere em lote.
+    Revalida, checa duplicidade (projeto + protocolo) e insere em lote.
     Usa 2 requests ao banco independente do número de linhas:
     1 SELECT para buscar existentes, 1 INSERT em lote com os novos.
     """
@@ -381,50 +436,96 @@ def _inserir_rows(rows: list, sb: SupabaseClient):
     for reg in rows:
         linha = reg.get("linha", "?")
         payload, erro_validacao = _revalidar_payload(reg)
-        if erro_validacao:
+        if payload is None:
             ignorados.append({"linha": linha, "motivo": erro_validacao})
         else:
+            if erro_validacao:
+                ignorados.append({"linha": linha, "motivo": erro_validacao})
             payloads_validos.append((linha, payload))
 
     if not payloads_validos:
         return imported, ignorados, erros
 
-    # Passo 2: buscar todos os protocolos existentes em uma única query
+    # Passo 2: buscar chaves (projeto, protocolo) já cadastradas
     try:
         existing_raw = (
             sb.table("protocols")
-            .select("projeto,protocolo,orgao_site_consultado")
+            .select("projeto,protocolo")
             .execute()
         )
         existing = {
-            (r["projeto"], r["protocolo"], r.get("orgao_site_consultado") or "")
+            (r["projeto"], r["protocolo"])
             for r in (existing_raw.data or [])
         }
     except Exception as e:
         erros.append({"linha": "dedup-check", "erro": f"Erro ao verificar duplicatas: {str(e)}"})
         return imported, ignorados, erros
 
-    # Passo 3: filtrar duplicatas em memória
+    # Passo 3: filtrar duplicatas (banco + repetidas na mesma planilha)
     to_insert: list[tuple[str, dict]] = []
     for linha, payload in payloads_validos:
-        key = (payload["projeto"], payload["protocolo"], payload.get("orgao_site_consultado") or "")
+        key = _chave_protocolo(payload)
         if key in existing:
-            ignorados.append({"linha": linha, "motivo": "Duplicata ignorada"})
+            ignorados.append({
+                "linha": linha,
+                "motivo": f"Duplicata ignorada: {payload['projeto']} / {payload['protocolo']} já cadastrado",
+            })
         else:
             to_insert.append((linha, payload))
+            existing.add(key)
 
     if not to_insert:
         return imported, ignorados, erros
 
-    # Passo 4: insert em lote em uma única request
+    # Passo 4: insert em lote (com fallback se o banco ainda usa VARCHAR(200))
+    payloads_insert = [p for _, p in to_insert]
     try:
-        sb.table("protocols").insert([p for _, p in to_insert]).execute()
+        sb.table("protocols").insert(payloads_insert).execute()
         imported = [
             {"linha": linha, "protocolo": p["protocolo"], "projeto": p["projeto"]}
             for linha, p in to_insert
         ]
     except Exception as e:
-        erros.append({"linha": "bulk-insert", "erro": f"Erro no insert em lote: {str(e)}"})
+        err_msg = str(e)
+        if "22001" in err_msg or "value too long" in err_msg.lower():
+            for p in payloads_insert:
+                _aplicar_limites_payload(p, _LIMITES_CAMPO_LEGACY)
+            try:
+                sb.table("protocols").insert(payloads_insert).execute()
+                imported = [
+                    {"linha": linha, "protocolo": p["protocolo"], "projeto": p["projeto"]}
+                    for linha, p in to_insert
+                ]
+                erros.append({
+                    "linha": "bulk-insert",
+                    "erro": (
+                        "Importado com textos truncados (colunas curtas no banco). "
+                        "Execute backend/migration_widen_protocol_text.sql no Supabase para preservar textos longos."
+                    ),
+                })
+            except Exception as e2:
+                erros.append({"linha": "bulk-insert", "erro": f"Erro no insert em lote: {str(e2)}"})
+        elif "23505" in err_msg or "duplicate key" in err_msg.lower() or "409" in err_msg:
+            for linha, p in to_insert:
+                try:
+                    sb.table("protocols").insert(p).execute()
+                    imported.append({
+                        "linha": linha,
+                        "protocolo": p["protocolo"],
+                        "projeto": p["projeto"],
+                    })
+                    existing.add(_chave_protocolo(p))
+                except Exception as row_err:
+                    row_msg = str(row_err)
+                    if "23505" in row_msg or "duplicate key" in row_msg.lower() or "409" in row_msg:
+                        ignorados.append({
+                            "linha": linha,
+                            "motivo": f"Duplicata ignorada: {p['projeto']} / {p['protocolo']} já cadastrado",
+                        })
+                    else:
+                        erros.append({"linha": linha, "erro": row_msg})
+        else:
+            erros.append({"linha": "bulk-insert", "erro": f"Erro no insert em lote: {err_msg}"})
 
     return imported, ignorados, erros
 

@@ -6,10 +6,10 @@ DROP TABLE IF EXISTS protocols CASCADE;
 CREATE TABLE protocols (
     id          BIGSERIAL PRIMARY KEY,
     status      VARCHAR(50)  NOT NULL,
-    projeto     VARCHAR(200) NOT NULL,
+    projeto     VARCHAR(500) NOT NULL,
     protocolo   VARCHAR(100) NOT NULL,
-    atividade   VARCHAR(200) NOT NULL,
-    orgao_site_consultado VARCHAR(200) NOT NULL,
+    atividade   TEXT NOT NULL,
+    orgao_site_consultado VARCHAR(500) NOT NULL,
     atribuido_a VARCHAR(100),
     data_abertura    DATE NOT NULL,
     data_finalizacao DATE,
@@ -20,7 +20,8 @@ CREATE TABLE protocols (
     ultima_consulta      TIMESTAMPTZ,
     observacao_consulta  TEXT,
     criado_em   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    atualizado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    atualizado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_projeto_protocolo UNIQUE (projeto, protocolo)
 );
 
 CREATE TABLE query_history (
