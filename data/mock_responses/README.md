@@ -1,20 +1,18 @@
 # Mock Responses
 
-Esta pasta é reservada para **HTMLs salvos** de consultas reais nos sites dos órgãos públicos.
+Pasta reservada para **HTMLs salvos** de páginas de resultado de órgãos públicos.
 
-## Uso atual do projeto
+## Uso no projeto atual
 
-Os scrapers em `backend/app/services/scrapers/` hoje usam **simulação em código** (respostas mockadas com `fonte_consulta` prefixada por `SIMULADO:`). Apenas o **Cartório de Imóveis (PR)** é consultado de forma real via Playwright (`backend/app/services/scraper.py`).
+Os scrapers em `backend/app/services/scrapers/` tratam a maior parte dos órgãos com **simulação em código** (`fonte_consulta` com prefixo `SIMULADO:`). As consultas **reais** (Playwright) estão em `scraper.py` e nos módulos listados no [README.md](../../README.md#consultas-aos-órgãos).
 
-Esta pasta **não é lida automaticamente** pelos scrapers atuais. Ela serve para:
+Esta pasta **não é lida automaticamente** pelo sistema. Serve para:
 
-- Desenvolvimento futuro com leitura de HTML offline
-- Testes quando um site público estiver indisponível
-- Evidências arquivadas da equipe
+- Evidências arquivadas pela equipe  
+- Testes offline quando um portal estiver indisponível  
+- Evolução futura (leitura de HTML com flag de ambiente)
 
-## Como usar no futuro
+## Uso futuro sugerido
 
-1. Salve o HTML da página de resultado como `orgao_protocolo.html`.
-2. Adapte o scraper correspondente para ler o arquivo quando `MOCK_RESPONSES=1` ou similar.
-
-Consulte o [README.md](../../README.md#consultas-aos-órgãos) para a lista de órgãos reais vs. simulados.
+1. Salve o HTML como `orgao_numero_protocolo.html`.
+2. No scraper correspondente, leia o arquivo quando `MOCK_RESPONSES=1` (ou similar).

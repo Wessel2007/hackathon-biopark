@@ -1,4 +1,4 @@
--- Execute este script no SQL Editor do Supabase (https://supabase.com/dashboard/project/mhejbpthkbcpwjshxzwz/sql)
+-- Execute este script no SQL Editor do seu projeto Supabase (Dashboard → SQL)
 
 DROP TABLE IF EXISTS query_history CASCADE;
 DROP TABLE IF EXISTS protocols CASCADE;

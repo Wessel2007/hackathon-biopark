@@ -15,7 +15,8 @@ env/
 *.db
 *.sqlite3
 
-# Env
+# Variáveis de ambiente (nunca versionar)
+.env
 .env.local
 .env.*.local
 
@@ -32,10 +33,16 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 
-# IDE
+# IDE / assistentes de IA
 .vscode/
 .idea/
 *.swp
+.claude/
+.cursor/
+
+# Excel (arquivos temporários de lock)
+~$*
+*.tmp
 
 # Relatórios gerados
 *.pdf

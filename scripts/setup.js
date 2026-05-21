@@ -54,6 +54,7 @@ const venvPython = pythonLauncher();
 const pip = `"${venvPython}" -m pip`;
 run(`${pip} install --upgrade pip`, backendDir);
 run(`${pip} install -r requirements.txt`, backendDir);
+run(`"${venvPython}" -m playwright install chromium`, backendDir);
 
 ensureEnvFile(
   path.join(backendDir, ".env.example"),

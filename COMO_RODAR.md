@@ -1,70 +1,97 @@
-# Como Rodar o Projeto
+# Como rodar o projeto
+
+Guia rápido para avaliação local. Detalhes de arquitetura, órgãos consultados e deploy estão no [README.md](README.md).
+
+---
 
 ## Pré-requisitos
 
-- Python 3.10+
-- Node.js 18+
+- **Python** 3.10 ou superior  
+- **Node.js** 18 ou superior  
 
 ---
 
-## Tudo de uma vez (recomendado)
+## Opção recomendada (um comando)
 
-Na raiz do repositório:
+Na **raiz** do repositório:
 
 ```bash
 npm run dev
 ```
 
-Esse comando:
-1. Instala dependências do Node (raiz + frontend) e do Python (`backend/.venv` + `requirements.txt`)
-2. Cria `.env` a partir dos exemplos, se ainda não existirem
-3. Sobe o backend (http://localhost:8000) e o frontend (http://localhost:5173) no mesmo terminal
+O script `scripts/setup.js`:
+
+1. Instala dependências Node (raiz + `frontend/`) e Python (`backend/.venv` + `requirements.txt`)
+2. Instala o Chromium do Playwright (necessário para consultas reais)
+3. Cria `backend/.env` e `frontend/.env` a partir dos `.env.example`, se ainda não existirem
+4. Sobe API (**http://localhost:8000**) e frontend (**http://localhost:5173**) no mesmo terminal
+
+Documentação interativa da API: **http://localhost:8000/docs**
 
 ---
 
-## Backend
+## Configuração manual (opcional)
+
+### Backend
 
 ```bash
 cd backend
+cp .env.example .env
+# Edite .env com URL e chaves do Supabase
+python -m venv .venv
+.venv\Scripts\activate          # Windows
+# source .venv/bin/activate     # Linux/macOS
 pip install -r requirements.txt
+python -m playwright install chromium
 uvicorn app.main:app --reload
 ```
 
-API disponível em http://localhost:8000 — documentação em http://localhost:8000/docs
-
----
-
-## Frontend
-
-Em outro terminal:
+### Frontend (outro terminal)
 
 ```bash
 cd frontend
+cp .env.example .env
+# VITE_API_URL=http://localhost:8000
 npm install
 npm run dev
 ```
-
-Frontend disponível em http://localhost:5173
 
 ---
 
 ## Login
 
-| Campo | Valor |
-|-------|-------|
-| E-mail | admin@biopark.com.br |
-| Senha | biopark2025 |
+Configure `DASHBOARD_EMAIL` e `DASHBOARD_PASSWORD` em `backend/.env`, ou use um usuário cadastrado na tabela `usuarios` do Supabase.
 
-O Dashboard (`/`) usa o token principal. A página de relatórios (`/reports`) pede login adicional com usuário **admin**.
+| Campo | Valor de exemplo (`.env.example`) |
+|-------|-----------------------------------|
+| E-mail | `admin@biopark.com.br` |
+| Senha | definida em `DASHBOARD_PASSWORD` |
+
+- **Dashboard** (`/`): token principal após login  
+- **Relatórios** (`/reports`): exige cargo `admin` + login em `/reports-login`
+
+---
 
 ## Demo — consultas reais vs. simuladas
 
-1. No Dashboard, abra o bloco **“Consultas aos órgãos — real vs. simulado”**.
-2. Consulte um protocolo de **Cartório de Imóveis** → `fonte_consulta` indica `CARTÓRIO PR`.
-3. Consulte um protocolo de **COPEL** (ou outro órgão) → `fonte_consulta` começa com `SIMULADO:`.
+1. No Dashboard, execute a consulta de um protocolo de **Cartório**, **SANEPAR** ou **COPEL Distribuição** (acompanhamento).
+2. Consulte um protocolo de **SEMA**, **Caixa** ou **COPEL genérico**.
+3. No histórico, compare `fonte_consulta`: consultas reais não usam o prefixo `SIMULADO:`.
 
-Tabela completa no [README.md](README.md#consultas-aos-órgãos).
+Tabela completa: [README.md — Consultas aos órgãos](README.md#consultas-aos-órgãos).
+
+---
 
 ## Relatório PDF
 
-Com o backend rodando e autenticado, use **Baixar PDF** no Dashboard ou em Relatórios. O arquivo inclui resumo, mudanças, erros e visão por empreendimento.
+Com o backend rodando e usuário autenticado, use **Baixar PDF** no Dashboard ou em Relatórios.
+
+---
+
+## Problemas comuns
+
+| Sintoma | Solução |
+|---------|---------|
+| Consulta real falha com erro de Playwright | Rode `python -m playwright install chromium` dentro de `backend/` (ou `npm run setup` na raiz) |
+| Front não conecta na API | Confira `VITE_API_URL` em `frontend/.env` |
+| Login recusado | Verifique Supabase, schema (`supabase_schema.sql`) e usuário/senha no `.env` |
