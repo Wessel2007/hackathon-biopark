@@ -68,6 +68,17 @@ export default function Reports() {
                   </div>
                 </div>
                 <div className="divide-y divide-gray-50">
+                  <div className="px-5 py-2 flex items-center justify-between gap-4 bg-gray-50/60 border-b border-gray-100">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider flex-shrink-0">Protocolo</span>
+                      <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Status</span>
+                    </div>
+                    <div className="flex items-center gap-4 text-[10px] font-semibold text-gray-400 uppercase tracking-wider flex-shrink-0">
+                      <span>Duração</span>
+                      <span>Última Consulta</span>
+                      <span className="w-16 text-center">Situação</span>
+                    </div>
+                  </div>
                   {items.map((p) => (
                     <div key={p.id} className="px-5 py-3.5 flex items-center justify-between gap-4 hover:bg-gray-50/50 transition-colors">
                       <div className="flex items-center gap-3 min-w-0">
@@ -77,11 +88,13 @@ export default function Reports() {
                       <div className="flex items-center gap-4 text-xs text-gray-400 flex-shrink-0">
                         <span>{p.duracao_dias != null ? `${p.duracao_dias} dias` : '—'}</span>
                         <span>{p.ultima_consulta ? new Date(p.ultima_consulta).toLocaleDateString('pt-BR') : 'sem consulta'}</span>
-                        {p.houve_mudanca && (
-                          <span className="flex items-center gap-1 text-amber-600 font-medium bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-full">
-                            <AlertTriangle size={10} /> Mudança
-                          </span>
-                        )}
+                        <span className="w-16 flex justify-center">
+                          {p.houve_mudanca && (
+                            <span className="flex items-center gap-1 text-amber-600 font-medium bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-full">
+                              <AlertTriangle size={10} /> Mudança
+                            </span>
+                          )}
+                        </span>
                       </div>
                     </div>
                   ))}
