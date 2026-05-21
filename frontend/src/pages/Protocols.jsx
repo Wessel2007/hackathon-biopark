@@ -10,6 +10,15 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
+const STATUS_CONFIG = [
+  { key: 'EM ANDAMENTO', label: 'ANDAMENTO', badge: 'bg-blue-50 text-blue-700 border-blue-200',     badgeActive: 'bg-blue-100 text-blue-800 border-blue-300',     activeBg: 'bg-blue-50',   activeBorder: 'border-blue-200',   activeValue: 'text-blue-800'   },
+  { key: 'PENDENTE',     label: 'PENDENTE',   badge: 'bg-amber-50 text-amber-700 border-amber-200', badgeActive: 'bg-amber-100 text-amber-800 border-amber-300', activeBg: 'bg-amber-50', activeBorder: 'border-amber-200', activeValue: 'text-amber-800' },
+  { key: 'APRO',        label: 'APRO',       badge: 'bg-emerald-50 text-emerald-700 border-emerald-200', badgeActive: 'bg-emerald-100 text-emerald-800 border-emerald-300', activeBg: 'bg-emerald-50', activeBorder: 'border-emerald-200', activeValue: 'text-emerald-800' },
+  { key: 'APROVADO',    label: 'APROVADO',   badge: 'bg-emerald-50 text-emerald-700 border-emerald-200', badgeActive: 'bg-emerald-100 text-emerald-800 border-emerald-300', activeBg: 'bg-emerald-50', activeBorder: 'border-emerald-200', activeValue: 'text-emerald-800' },
+  { key: 'CANCELADO',   label: 'CANCELADO',  badge: 'bg-red-50 text-red-700 border-red-200',       badgeActive: 'bg-red-100 text-red-800 border-red-300',       activeBg: 'bg-red-50',   activeBorder: 'border-red-200',   activeValue: 'text-red-800'   },
+  { key: 'REPROVADO',   label: 'REPROVADO',  badge: 'bg-red-50 text-red-700 border-red-200',       badgeActive: 'bg-red-100 text-red-800 border-red-300',       activeBg: 'bg-red-50',   activeBorder: 'border-red-200',   activeValue: 'text-red-800'   },
+]
+
 const EMPTY_FORM = {
   status: 'PENDENTE', projeto: '', protocolo: '', atividade: '',
   orgao_site_consultado: '', atribuido_a: '', data_abertura: '',
@@ -24,6 +33,7 @@ export default function Protocols() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterOrgao, setFilterOrgao] = useState('')
+  const [filterStatus, setFilterStatus] = useState('')
   const [formError, setFormError] = useState(null)
   const [pageError, setPageError] = useState(null)
   const [importing, setImporting] = useState(false)
@@ -51,6 +61,12 @@ export default function Protocols() {
     [data]
   )
 
+  const statusCounts = useMemo(() => {
+    const counts = {}
+    data.forEach(p => { counts[p.status] = (counts[p.status] ?? 0) + 1 })
+    return counts
+  }, [data])
+
   const filteredData = useMemo(() => {
     const q = searchQuery.toLowerCase().trim()
     return data.filter(p => {
@@ -59,9 +75,10 @@ export default function Protocols() {
         p.orgao_site_consultado, p.situacao, p.atribuido_a,
       ].some(f => f?.toLowerCase().includes(q))
       const matchesOrgao = !filterOrgao || p.orgao_site_consultado === filterOrgao
-      return matchesSearch && matchesOrgao
+      const matchesStatus = !filterStatus || p.status === filterStatus
+      return matchesSearch && matchesOrgao && matchesStatus
     })
-  }, [data, searchQuery, filterOrgao])
+  }, [data, searchQuery, filterOrgao, filterStatus])
 
   const saveMut = useMutation({
     mutationFn: (d) => editItem ? updateProtocol(editItem.id, d) : createProtocol(d),
@@ -139,7 +156,7 @@ export default function Protocols() {
     ['url_consulta', 'URL Consulta'],
   ]
 
-  const hasFilters = searchQuery || filterOrgao
+  const hasFilters = searchQuery || filterOrgao || filterStatus
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -181,6 +198,34 @@ export default function Protocols() {
           </div>
         )}
 
+        {/* Cards de status */}
+        {!isLoading && data.length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {STATUS_CONFIG.filter(s => statusCounts[s.key] > 0).map(s => (
+              <button
+                key={s.key}
+                onClick={() => setFilterStatus(prev => prev === s.key ? '' : s.key)}
+                className={`text-left rounded-xl border p-3.5 transition group ${
+                  filterStatus === s.key
+                    ? `${s.activeBg} ${s.activeBorder} shadow-sm`
+                    : 'bg-white border-gray-100 hover:border-gray-200 shadow-sm hover:shadow'
+                }`}
+              >
+                <div className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border mb-2 ${
+                  filterStatus === s.key ? s.badgeActive : s.badge
+                }`}>
+                  {s.label}
+                </div>
+                <p className={`text-2xl font-bold tabular-nums leading-none ${
+                  filterStatus === s.key ? s.activeValue : 'text-gray-900'
+                }`}>
+                  {statusCounts[s.key]}
+                </p>
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Search & filter bar */}
         <div className="flex gap-3 items-center flex-wrap">
           <div className="relative flex-1 min-w-64">
@@ -213,7 +258,7 @@ export default function Protocols() {
 
           {hasFilters && (
             <button
-              onClick={() => { setSearchQuery(''); setFilterOrgao('') }}
+              onClick={() => { setSearchQuery(''); setFilterOrgao(''); setFilterStatus('') }}
               className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 bg-white border border-gray-200 px-3 py-2.5 rounded-xl shadow-sm transition"
             >
               <X size={12} /> Limpar filtros
