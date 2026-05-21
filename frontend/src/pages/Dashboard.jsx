@@ -14,11 +14,15 @@ import {
 } from 'lucide-react'
 
 const STATUS_CONFIG = [
-  { key: 'EM ANDAMENTO', label: 'Em andamento', chipBg: 'bg-brand-100', chipFg: 'text-brand-700', dot: 'bg-accent-blue',  barPct: 'bg-accent-blue'  },
-  { key: 'PENDENTE',     label: 'Pendente',     chipBg: 'bg-amber-50',  chipFg: 'text-amber-800', dot: 'bg-accent-amber', barPct: 'bg-accent-amber' },
-  { key: 'APROVADO',     label: 'Aprovado',     chipBg: 'bg-emerald-50', chipFg: 'text-emerald-700', dot: 'bg-accent-green', barPct: 'bg-accent-green' },
-  { key: 'CANCELADO',    label: 'Cancelado',    chipBg: 'bg-red-50',    chipFg: 'text-red-700',   dot: 'bg-accent-red',   barPct: 'bg-accent-red'   },
-  { key: 'REPROVADO',    label: 'Reprovado',    chipBg: 'bg-red-50',    chipFg: 'text-red-700',   dot: 'bg-red-400',      barPct: 'bg-red-400'      },
+  { key: 'EM ANDAMENTO',           label: 'Em andamento',      chipBg: 'bg-brand-100',  chipFg: 'text-brand-700',    dot: 'bg-accent-blue',    barPct: 'bg-accent-blue'    },
+  { key: 'PENDENTE',               label: 'Pendente',          chipBg: 'bg-amber-50',   chipFg: 'text-amber-800',   dot: 'bg-accent-amber',   barPct: 'bg-accent-amber'   },
+  { key: 'EM ANÁLISE',             label: 'Em análise',        chipBg: 'bg-sky-50',     chipFg: 'text-sky-700',     dot: 'bg-sky-400',        barPct: 'bg-sky-400'        },
+  { key: 'APROVADO',               label: 'Aprovado',          chipBg: 'bg-emerald-50', chipFg: 'text-emerald-700', dot: 'bg-accent-green',   barPct: 'bg-accent-green'   },
+  { key: 'REGISTRADO',             label: 'Registrado',        chipBg: 'bg-teal-50',    chipFg: 'text-teal-700',    dot: 'bg-teal-400',       barPct: 'bg-teal-400'       },
+  { key: 'AGUARDANDO DOCUMENTAÇÃO',label: 'Ag. documentação',  chipBg: 'bg-orange-50',  chipFg: 'text-orange-700',  dot: 'bg-orange-400',     barPct: 'bg-orange-400'     },
+  { key: 'AGUARDANDO VISTORIA',    label: 'Ag. vistoria',      chipBg: 'bg-orange-50',  chipFg: 'text-orange-700',  dot: 'bg-orange-300',     barPct: 'bg-orange-300'     },
+  { key: 'CANCELADO',              label: 'Cancelado',         chipBg: 'bg-red-50',     chipFg: 'text-red-700',     dot: 'bg-accent-red',     barPct: 'bg-accent-red'     },
+  { key: 'REPROVADO',              label: 'Reprovado',         chipBg: 'bg-red-50',     chipFg: 'text-red-700',     dot: 'bg-red-400',        barPct: 'bg-red-400'        },
 ]
 
 const EMPTY_FORM = {
@@ -318,15 +322,16 @@ export default function Dashboard() {
               <span className="text-xs text-muted">{protocols.length} protocolos</span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-              {STATUS_CONFIG.filter(s => statusCounts[s.key] > 0).map(s => {
+              {STATUS_CONFIG.map(s => {
                 const isActive = filterStatus === s.key
                 const count = statusCounts[s.key] ?? 0
-                const pct = Math.round((count / protocols.length) * 100)
+                const pct = protocols.length > 0 ? Math.round((count / protocols.length) * 100) : 0
+                const isEmpty = count === 0
                 return (
                   <button
                     key={s.key}
                     onClick={() => setFilterStatus(prev => prev === s.key ? '' : s.key)}
-                    className={`text-left rounded-xl p-4 transition border ${isActive ? 'bg-paper border-line-2' : 'border-transparent hover:bg-paper'}`}
+                    className={`text-left rounded-xl p-4 transition border ${isActive ? 'bg-paper border-line-2' : 'border-transparent hover:bg-paper'} ${isEmpty ? 'opacity-40' : ''}`}
                   >
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-1.5">
