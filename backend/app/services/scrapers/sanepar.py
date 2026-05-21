@@ -1,80 +1,41 @@
 """
-Scraper para SANEPAR (Companhia de Saneamento do Paraná).
+Scraper real para consulta de protocolo da SANEPAR no ePROTOCOLO (Governo do PR).
 
-O portal da SANEPAR exige autenticação para rastreamento de protocolos de
-obra, tornando automação direta inviável. Este módulo simula consultas de
-solicitações de ligação de água e esgoto.
+Fluxo:
+- Abre consultarProtocoloDigital.do?action=iniciarProcesso
+- Preenche #numeroProtocolo e clica em #btnPesquisar
+- Extrai Último Andamento: Local de Envio, Onde está, Motivo, Enviado em e dias em trâmite
 """
 
-import random
-from datetime import datetime, timedelta
+from __future__ import annotations
 
+from app.services.scrapers.eprotocolo_pr import query_protocol as _query_eprotocolo
 
-_FONTE = "SIMULADO: SANEPAR — Companhia de Saneamento do Paraná"
-
-_STATUSES = [
-    (
-        "EM ANÁLISE",
-        "Solicitação {protocolo} em análise técnica pelo setor de Projetos e Obras da SANEPAR. "
-        "Prazo estimado: 20 dias úteis para emissão de parecer.",
-    ),
-    (
-        "AGUARDANDO VISTORIA",
-        "Solicitação {protocolo} com documentação aprovada. Aguardando agendamento de "
-        "vistoria técnica no local para verificação das condições de ligação.",
-    ),
-    (
-        "APROVADO",
-        "Solicitação {protocolo} aprovada. Ligação de água e esgoto autorizada. "
-        "A execução será realizada pela SANEPAR em até 15 dias úteis após confirmação.",
-    ),
-    (
-        "AGUARDANDO DOCUMENTAÇÃO",
-        "Solicitação {protocolo} suspensa. Apresentar: Certidão de Uso do Solo, "
-        "Habite-se ou Alvará de Construção atualizado. Prazo: 30 dias para regularização.",
-    ),
-    (
-        "REPROVADO",
-        "Solicitação {protocolo} indeferida. Não conformidade com normas técnicas "
-        "da SANEPAR. Consultar o laudo técnico disponível no portal do cliente.",
-    ),
-]
-
-
-def _error(protocol: str, msg: str) -> dict:
-    return {
-        "success":     False,
-        "protocol":    protocol,
-        "status":      None,
-        "observation": None,
-        "updatedAt":   None,
-        "rawText":     None,
-        "error":       msg,
-        "_fonte":      _FONTE,
-        "_situacao":   None,
-        "_screenshot": None,
-    }
+URL = (
+    "https://www.eprotocolo.pr.gov.br/spiweb/consultarProtocoloDigital.do"
+    "?action=iniciarProcesso"
+)
+FONTE = "SANEPAR — Companhia de Saneamento do Paraná (ePROTOCOLO PR)"
+PORTAL_LABEL = "SANEPAR — Companhia de Saneamento do Paraná"
 
 
 def query(protocol: str, orgao: str, url: str) -> dict:
-    if not protocol:
-        return _error(protocol, "Número do protocolo não informado — consulta não realizada.")
+    return query_protocol(
+        {
+            "protocolo": protocol,
+            "url_consulta": url,
+            "orgao_site_consultado": orgao,
+        }
+    )
 
-    days_ago = random.randint(0, 30)
-    data_mov = (datetime.now() - timedelta(days=days_ago)).strftime("%d/%m/%Y")
 
-    status, obs_template = random.choice(_STATUSES)
-    obs = obs_template.format(protocolo=protocol)
-
-    return {
-        "success":     True,
-        "protocol":    protocol,
-        "status":      status,
-        "observation": obs,
-        "updatedAt":   data_mov,
-        "rawText":     None,
-        "error":       None,
-        "_fonte":      _FONTE,
-        "_situacao":   None,
-        "_screenshot": None,
-    }
+def query_protocol(p: dict) -> dict:
+    payload = dict(p)
+    if not (payload.get("url_consulta") or "").strip():
+        payload["url_consulta"] = URL
+    return _query_eprotocolo(
+        payload,
+        fonte=FONTE,
+        default_url=URL,
+        portal_label=PORTAL_LABEL,
+    )

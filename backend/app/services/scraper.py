@@ -136,9 +136,18 @@ def _is_copel_distribuicao_query(p: dict) -> bool:
     return url_copel or (("copel" in orgao) and url_copel)
 
 
+# Scraper real - ePROTOCOLO PR (SANEPAR)
+def _is_eprotocolo_sanepar_query(p: dict) -> bool:
+    """Retorna True para consultas de protocolo da SANEPAR no portal ePROTOCOLO."""
+    orgao = _normalize(p.get("orgao_site_consultado") or "")
+    return "sanepar" in orgao
+
+
 # Scraper real - ePROTOCOLO PR (Corpo de Bombeiros do Paraná / CBPR)
 def _is_eprotocolo_cbpr_query(p: dict) -> bool:
     """Retorna True para consultas de protocolo do CBPR no portal ePROTOCOLO."""
+    if _is_eprotocolo_sanepar_query(p):
+        return False
     url = (p.get("url_consulta") or "").lower()
     orgao = _normalize(p.get("orgao_site_consultado") or "")
     url_eprotocolo = (
@@ -430,6 +439,11 @@ def _query_source(p: dict) -> dict:
     if _is_copel_distribuicao_query(p):
         from app.services.scrapers.dispatcher import _to_internal
         from app.services.scrapers.copel_distribuicao import query_protocol
+
+        return _to_internal(query_protocol(p))
+    if _is_eprotocolo_sanepar_query(p):
+        from app.services.scrapers.dispatcher import _to_internal
+        from app.services.scrapers.sanepar import query_protocol
 
         return _to_internal(query_protocol(p))
     if _is_eprotocolo_cbpr_query(p):

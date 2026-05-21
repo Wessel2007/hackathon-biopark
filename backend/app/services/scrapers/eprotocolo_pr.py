@@ -18,15 +18,24 @@ import re
 from typing import Any
 
 
-URL = "https://www.eprotocolo.pr.gov.br/spiweb/consultarProtocoloDigital.do?action=pesquisar"
-FONTE = "CBPR — Corpo de Bombeiros do Paraná (ePROTOCOLO PR)"
+URL_CBPR = "https://www.eprotocolo.pr.gov.br/spiweb/consultarProtocoloDigital.do?action=pesquisar"
+URL = URL_CBPR
+FONTE_CBPR = "CBPR — Corpo de Bombeiros do Paraná (ePROTOCOLO PR)"
+FONTE = FONTE_CBPR
+PORTAL_LABEL_CBPR = "Corpo de Bombeiros do Paraná"
 
 
 def _only_digits(value: str) -> str:
     return re.sub(r"\D+", "", value or "")
 
 
-def _error(protocol: str, msg: str, situacao: str | None = None) -> dict:
+def _error(
+    protocol: str,
+    msg: str,
+    situacao: str | None = None,
+    *,
+    fonte: str = FONTE,
+) -> dict:
     return {
         "success": False,
         "protocol": protocol,
@@ -35,7 +44,7 @@ def _error(protocol: str, msg: str, situacao: str | None = None) -> dict:
         "updatedAt": None,
         "rawText": None,
         "error": msg,
-        "_fonte": FONTE,
+        "_fonte": fonte,
         "_situacao": situacao,
         "_screenshot": None,
     }
@@ -159,9 +168,13 @@ def _extract_fields_from_html(html: str) -> dict[str, str]:
     return fields
 
 
-def _build_observation(protocol: str, fields: dict[str, str]) -> str:
+def _build_observation(
+    protocol: str,
+    fields: dict[str, str],
+    portal_label: str = PORTAL_LABEL_CBPR,
+) -> str:
     parts = [
-        f"Protocolo {protocol} consultado no ePROTOCOLO PR (Corpo de Bombeiros do Paraná).",
+        f"Protocolo {protocol} consultado no ePROTOCOLO PR ({portal_label}).",
         f"Local de Envio: {fields['Local de Envio']}" if fields.get("Local de Envio") else None,
         f"Onde está: {fields['Onde está']}" if fields.get("Onde está") else None,
         f"Motivo: {fields['Motivo']}" if fields.get("Motivo") else None,
@@ -178,6 +191,8 @@ def _parse_result(
     body_text: str,
     protocol: str,
     fields: dict[str, str],
+    *,
+    portal_label: str = PORTAL_LABEL_CBPR,
 ) -> tuple[str | None, str, str | None, str | None]:
     clean_text = re.sub(r"\s+", " ", body_text or "").strip()
     not_found = re.search(
@@ -207,7 +222,7 @@ def _parse_result(
 
     motivo = fields.get("Motivo") or ""
     status = _map_status(motivo)
-    observation = _build_observation(protocol, fields)
+    observation = _build_observation(protocol, fields, portal_label)
     updated_at = _parse_enviado_em(fields.get("Enviado em"))
     return status, observation, updated_at, None
 
@@ -291,14 +306,22 @@ def _wait_for_result(page: Any) -> None:
     page.wait_for_timeout(1500)
 
 
-def _sync_query(protocol: str, numero_protocolo: str, url: str) -> dict:
+def _sync_query(
+    protocol: str,
+    numero_protocolo: str,
+    url: str,
+    *,
+    fonte: str = FONTE,
+    default_url: str = URL,
+    portal_label: str = PORTAL_LABEL_CBPR,
+) -> dict:
     try:
         from playwright.sync_api import TimeoutError as PWTimeout
         from playwright.sync_api import sync_playwright
     except ImportError:
-        return _error(protocol, "Playwright nao instalado.")
+        return _error(protocol, "Playwright nao instalado.", fonte=fonte)
 
-    target_url = (url or "").strip() or URL
+    target_url = (url or "").strip() or default_url
 
     with sync_playwright() as pw:
         browser = pw.chromium.launch(
@@ -320,7 +343,7 @@ def _sync_query(protocol: str, numero_protocolo: str, url: str) -> dict:
 
         if not _click_search(page):
             browser.close()
-            return _error(protocol, "Botao Pesquisar nao localizado no ePROTOCOLO PR.")
+            return _error(protocol, "Botao Pesquisar nao localizado no ePROTOCOLO PR.", fonte=fonte)
 
         _wait_for_result(page)
 
@@ -332,7 +355,9 @@ def _sync_query(protocol: str, numero_protocolo: str, url: str) -> dict:
             fields = _extract_fields_from_html(html)
         browser.close()
 
-    status, observation, updated_at, situacao = _parse_result(html, body_text, protocol, fields)
+    status, observation, updated_at, situacao = _parse_result(
+        html, body_text, protocol, fields, portal_label=portal_label
+    )
     raw_payload = {"campos": fields, "protocolo_consultado": numero_protocolo}
     raw_text = f"EPROTOCOLO_PR={json.dumps(raw_payload, ensure_ascii=False)}\n{html[:6500] if html else ''}"[:8000]
 
@@ -345,7 +370,7 @@ def _sync_query(protocol: str, numero_protocolo: str, url: str) -> dict:
             "updatedAt": updated_at,
             "rawText": raw_text,
             "error": None,
-            "_fonte": FONTE,
+            "_fonte": fonte,
             "_situacao": situacao,
             "_screenshot": base64.b64encode(screenshot).decode(),
         }
@@ -359,7 +384,7 @@ def _sync_query(protocol: str, numero_protocolo: str, url: str) -> dict:
             "updatedAt": updated_at,
             "rawText": raw_text,
             "error": observation,
-            "_fonte": FONTE,
+            "_fonte": fonte,
             "_situacao": situacao,
             "_screenshot": base64.b64encode(screenshot).decode(),
         }
@@ -372,7 +397,7 @@ def _sync_query(protocol: str, numero_protocolo: str, url: str) -> dict:
         "updatedAt": updated_at,
         "rawText": raw_text,
         "error": None,
-        "_fonte": FONTE,
+        "_fonte": fonte,
         "_situacao": situacao,
         "_screenshot": base64.b64encode(screenshot).decode(),
     }
@@ -382,20 +407,38 @@ def query(protocol: str, orgao: str, url: str) -> dict:
     return query_protocol({"protocolo": protocol, "url_consulta": url, "orgao_site_consultado": orgao})
 
 
-def query_protocol(p: dict) -> dict:
+def query_protocol(
+    p: dict,
+    *,
+    fonte: str = FONTE,
+    default_url: str = URL,
+    portal_label: str = PORTAL_LABEL_CBPR,
+) -> dict:
     protocol = (p.get("protocolo") or "").strip()
     if not protocol:
-        return _error(protocol, "Numero do protocolo nao informado - consulta nao realizada.")
+        return _error(protocol, "Numero do protocolo nao informado - consulta nao realizada.", fonte=fonte)
 
     numero = _only_digits(protocol)[:12]
     if not numero:
-        return _error(protocol, "Numero do protocolo invalido para consulta no ePROTOCOLO PR.")
+        return _error(
+            protocol,
+            "Numero do protocolo invalido para consulta no ePROTOCOLO PR.",
+            fonte=fonte,
+        )
 
     url = (p.get("url_consulta") or "").strip()
 
     try:
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(_sync_query, protocol, numero, url)
+            future = executor.submit(
+                _sync_query,
+                protocol,
+                numero,
+                url,
+                fonte=fonte,
+                default_url=default_url,
+                portal_label=portal_label,
+            )
             return future.result(timeout=120)
     except Exception as exc:
-        return _error(protocol, f"Erro na consulta ao ePROTOCOLO PR: {str(exc)[:300]}")
+        return _error(protocol, f"Erro na consulta ao ePROTOCOLO PR: {str(exc)[:300]}", fonte=fonte)

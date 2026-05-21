@@ -98,7 +98,7 @@ A plataforma distingue consulta **real** e **simulada**. O histórico grava `fon
 |--------------|------|----------------|
 | Cartório de Imóveis (PR) — `cartoriospr.com.br` | **Real** | Playwright em `backend/app/services/scraper.py` (screenshot + parse HTML) |
 | COPEL | Simulado | `backend/app/services/scrapers/copel.py` — prefixo `SIMULADO: COPEL` |
-| SANEPAR | Simulado | `scrapers/sanepar.py` |
+| SANEPAR (ePROTOCOLO PR) | **Real** | `scrapers/sanepar.py` — Playwright no ePROTOCOLO |
 | Corpo de Bombeiros (CBPR) | Simulado | `scrapers/bombeiros.py` |
 | SEMA / IAT (ambiental) | Simulado | `scrapers/sema.py` |
 | Caixa Econômica Federal | Simulado | `scrapers/caixa.py` |
