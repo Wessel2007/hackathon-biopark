@@ -53,7 +53,7 @@ export default function Protocols() {
 
   const { data = [], isLoading } = useQuery({
     queryKey: ['protocols'],
-    queryFn: () => getProtocols({}),
+    queryFn: () => getProtocols({ limit: 10000 }),
   })
 
   const uniqueOrgaos = useMemo(() =>
