@@ -23,7 +23,7 @@ const STATUS_CONFIG = [
 const EMPTY_FORM = {
   status: 'PENDENTE', projeto: '', protocolo: '', atividade: '',
   orgao_site_consultado: '', atribuido_a: '', data_abertura: '',
-  data_finalizacao: '', situacao: '', ativo: true, url_consulta: '',
+  data_finalizacao: '', situacao: '', anotacoes: '', ativo: true, url_consulta: '',
 }
 
 export default function Protocols() {
@@ -112,6 +112,7 @@ export default function Protocols() {
       data_abertura:         form.data_abertura,
       data_finalizacao:      form.data_finalizacao || null,
       situacao:              form.situacao      || null,
+      anotacoes:             form.anotacoes?.trim() || null,
       ativo:                 form.ativo,
       url_consulta:          form.url_consulta  || null,
     }
@@ -327,6 +328,16 @@ export default function Protocols() {
                       />
                     </div>
                   ))}
+                  <div className="col-span-2">
+                    <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Anotações</label>
+                    <textarea
+                      rows={3}
+                      value={form.anotacoes ?? ''}
+                      onChange={(e) => setForm(f => ({ ...f, anotacoes: e.target.value }))}
+                      placeholder="Observações internas sobre o protocolo…"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent focus:bg-white transition resize-y"
+                    />
+                  </div>
                   <div className="col-span-2 flex items-center gap-2.5 bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-200">
                     <input type="checkbox" id="ativo" checked={form.ativo} onChange={(e) => setForm(f => ({ ...f, ativo: e.target.checked }))} className="w-4 h-4 rounded accent-brand-600" />
                     <label htmlFor="ativo" className="text-sm text-gray-700 font-medium cursor-pointer">Protocolo ativo</label>

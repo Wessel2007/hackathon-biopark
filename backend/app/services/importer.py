@@ -480,6 +480,7 @@ def _inserir_rows(rows: list, sb: SupabaseClient):
         existing_raw = (
             sb.table("protocols")
             .select("projeto,protocolo")
+            .limit(10000)
             .execute()
         )
         existing = {

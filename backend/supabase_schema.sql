@@ -37,7 +37,8 @@ CREATE TABLE query_history (
     data_movimentacao TEXT,
     mudancas_detectadas TEXT,
     fonte_consulta TEXT,
-    status_anterior TEXT
+    status_anterior TEXT,
+    screenshot_base64 TEXT
 );
 
 CREATE INDEX idx_protocols_projeto   ON protocols(projeto);
@@ -54,12 +55,22 @@ CREATE TRIGGER trg_protocols_updated_at
     BEFORE UPDATE ON protocols
     FOR EACH ROW EXECUTE FUNCTION _set_updated_at();
 
+CREATE TABLE usuarios (
+    id         BIGSERIAL PRIMARY KEY,
+    email      VARCHAR(255) NOT NULL UNIQUE,
+    senha_hash TEXT NOT NULL,
+    cargo      VARCHAR(50) NOT NULL DEFAULT 'usuario'
+);
+
 -- Desativa RLS para uso no hackathon (backend usa anon key diretamente)
 ALTER TABLE protocols    DISABLE ROW LEVEL SECURITY;
 ALTER TABLE query_history DISABLE ROW LEVEL SECURITY;
+ALTER TABLE usuarios      DISABLE ROW LEVEL SECURITY;
 
 -- Permissões para a role anon (chave publishable)
 GRANT ALL ON TABLE protocols    TO anon;
 GRANT ALL ON TABLE query_history TO anon;
+GRANT ALL ON TABLE usuarios      TO anon;
 GRANT USAGE, SELECT ON SEQUENCE protocols_id_seq      TO anon;
 GRANT USAGE, SELECT ON SEQUENCE query_history_id_seq  TO anon;
+GRANT USAGE, SELECT ON SEQUENCE usuarios_id_seq       TO anon;
