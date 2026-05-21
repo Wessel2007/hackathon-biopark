@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getProtocols, createProtocol, updateProtocol, deleteProtocol, bulkDeleteProtocols, runSingleQuery, importSpreadsheet } from '../services/api'
-import { Plus, Upload, RefreshCw, Pencil, Trash2, ArrowLeft } from 'lucide-react'
+import { Plus, Upload, RefreshCw, Pencil, Trash2, ArrowLeft, Search, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 const EMPTY_FORM = {
@@ -16,7 +16,7 @@ export default function Protocols() {
   const [showForm, setShowForm] = useState(false)
   const [editItem, setEditItem] = useState(null)
   const [form, setForm] = useState(EMPTY_FORM)
-  const [filterProjeto, setFilterProjeto] = useState('')
+  const [filters, setFilters] = useState({ projeto: '', protocolo: '', status: '', ativo: '' })
   const [formError, setFormError] = useState(null)
   const [pageError, setPageError] = useState(null)
   const [importing, setImporting] = useState(false)
@@ -25,10 +25,25 @@ export default function Protocols() {
   const [showBulkConfirm, setShowBulkConfirm] = useState(false)
   const [queryResult, setQueryResult] = useState(null)
 
+  function buildParams() {
+    const p = {}
+    if (filters.projeto) p.projeto = filters.projeto
+    if (filters.protocolo) p.protocolo = filters.protocolo
+    if (filters.status) p.status = filters.status
+    if (filters.ativo !== '') p.ativo = filters.ativo === 'true'
+    return p
+  }
+
   const { data = [], isLoading } = useQuery({
-    queryKey: ['protocols', filterProjeto],
-    queryFn: () => getProtocols(filterProjeto ? { projeto: filterProjeto } : {}),
+    queryKey: ['protocols', filters],
+    queryFn: () => getProtocols(buildParams()),
   })
+
+  function clearFilters() {
+    setFilters({ projeto: '', protocolo: '', status: '', ativo: '' })
+  }
+
+  const hasActiveFilters = Object.values(filters).some(v => v !== '')
 
   const saveMut = useMutation({
     mutationFn: (d) => editItem ? updateProtocol(editItem.id, d) : createProtocol(d),
@@ -161,12 +176,76 @@ export default function Protocols() {
             <button onClick={() => setPageError(null)} className="font-bold ml-4">×</button>
           </div>
         )}
-        <input
-          placeholder="Filtrar por projeto..."
-          value={filterProjeto}
-          onChange={(e) => setFilterProjeto(e.target.value)}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-brand-500"
-        />
+
+        <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3 shadow-sm">
+          <div className="flex items-center gap-2 text-sm font-medium text-gray-600">
+            <Search size={14} />
+            Filtros
+            {hasActiveFilters && (
+              <button onClick={clearFilters} className="ml-auto flex items-center gap-1 text-xs text-gray-400 hover:text-red-500 transition">
+                <X size={12} /> Limpar filtros
+              </button>
+            )}
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Empreendimento</label>
+              <input
+                list="projetos-list"
+                placeholder="Ex: Horizont, Duucale..."
+                value={filters.projeto}
+                onChange={(e) => setFilters(f => ({ ...f, projeto: e.target.value }))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+              <datalist id="projetos-list">
+                {[...new Set(data.map(p => p.projeto))].sort().map(p => (
+                  <option key={p} value={p} />
+                ))}
+              </datalist>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Protocolo / Processo</label>
+              <input
+                placeholder="Número do protocolo..."
+                value={filters.protocolo}
+                onChange={(e) => setFilters(f => ({ ...f, protocolo: e.target.value }))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Status</label>
+              <select
+                value={filters.status}
+                onChange={(e) => setFilters(f => ({ ...f, status: e.target.value }))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white"
+              >
+                <option value="">Todos os status</option>
+                <option value="PENDENTE">Pendente</option>
+                <option value="EM ANDAMENTO">Em Andamento</option>
+                <option value="APRO">Aprovado</option>
+                <option value="REPROVADO">Reprovado</option>
+                <option value="CANCELADO">Cancelado</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Situação</label>
+              <select
+                value={filters.ativo}
+                onChange={(e) => setFilters(f => ({ ...f, ativo: e.target.value }))}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white"
+              >
+                <option value="">Todos</option>
+                <option value="true">Ativos</option>
+                <option value="false">Inativos</option>
+              </select>
+            </div>
+          </div>
+          {hasActiveFilters && (
+            <p className="text-xs text-brand-700 font-medium">
+              {data.length} resultado(s) encontrado(s)
+            </p>
+          )}
+        </div>
 
         {showForm && (
           <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
