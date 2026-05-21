@@ -1,3 +1,4 @@
+import re
 from datetime import date
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -7,6 +8,12 @@ from app.schemas.protocol import ProtocolCreate, ProtocolUpdate
 from app.routers.deps import get_current_user
 
 router = APIRouter(prefix="/protocols", tags=["protocols"])
+
+
+def _normaliza_projeto(nome: str) -> str:
+    if not nome:
+        return nome
+    return re.sub(r" {2,}", " ", nome.strip()).title()
 
 
 def _add_duracao(p: dict) -> dict:
@@ -61,6 +68,7 @@ def get_protocol(protocol_id: int, sb: SupabaseClient = Depends(get_supabase), _
 
 @router.post("/", status_code=201)
 def create_protocol(body: ProtocolCreate, sb: SupabaseClient = Depends(get_supabase), _: str = Depends(get_current_user)):
+    body.projeto = _normaliza_projeto(body.projeto)
     existing = sb.table("protocols").select("id").eq("projeto", body.projeto).eq("protocolo", body.protocolo).execute()
     if existing.data:
         raise HTTPException(status_code=409, detail="Protocolo já cadastrado para este projeto")
@@ -82,6 +90,8 @@ def update_protocol(
     if not existing.data:
         raise HTTPException(status_code=404, detail="Protocolo não encontrado")
     payload = {k: v for k, v in body.model_dump(exclude_unset=True).items()}
+    if "projeto" in payload and payload["projeto"]:
+        payload["projeto"] = _normaliza_projeto(payload["projeto"])
     for k, v in payload.items():
         if hasattr(v, "isoformat"):
             payload[k] = v.isoformat()

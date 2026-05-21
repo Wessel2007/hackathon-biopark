@@ -43,6 +43,13 @@ def _limpa_texto(v):
     return s if s else None
 
 
+def _normaliza_projeto(nome: str) -> str:
+    if not nome:
+        return nome
+    nome = re.sub(r" {2,}", " ", nome.strip())
+    return nome.title()
+
+
 def _formata_data(v):
     """Converte qualquer valor de data para ISO string ou None — nunca lança exceção."""
     if v is None:
@@ -75,7 +82,8 @@ def _inferir_ativo(status, data_finalizacao):
 
 def _projeto_do_nome(nome_aba):
     partes = nome_aba.split(" - ", 1)
-    return partes[-1].strip() if len(partes) > 1 else nome_aba.strip()
+    raw = partes[-1].strip() if len(partes) > 1 else nome_aba.strip()
+    return _normaliza_projeto(raw)
 
 
 def _safe_get(row, idx, default=None):
@@ -103,7 +111,7 @@ def _extrai_projeto_protocolo(col_b_val, col_b_header, nome_aba):
             partes = texto.split(sep, 1)
             projeto, protocolo = partes[0].strip(), partes[1].strip()
             if projeto and protocolo:
-                return projeto, protocolo
+                return _normaliza_projeto(projeto), protocolo
 
     # Sem separador reconhecível — projeto do nome da aba, tudo vira protocolo
     return _projeto_do_nome(nome_aba), texto
@@ -121,6 +129,8 @@ def _revalidar_payload(reg: dict):
         val = str(reg.get(campo, "") or "").strip()
         if campo == "status":
             val = _normaliza_status(val)
+        elif campo == "projeto":
+            val = _normaliza_projeto(val)
         if not val:
             return None, f"Campo obrigatório ausente: {campo}"
         payload[campo] = val
@@ -261,7 +271,7 @@ def _processar_carga_inicial(file_buffer):
         linha = f"Carga Inicial:{i + 5}"
         try:
             status = _normaliza_status(row.get("status", ""))
-            projeto = str(row.get("projeto", "")).strip()
+            projeto = _normaliza_projeto(str(row.get("projeto", "")).strip())
             protocolo = str(row.get("protocolo", "")).strip()
             atividade = str(row.get("atividade", "")).strip()
             orgao = str(row.get("orgao_site_consultado", "")).strip()
