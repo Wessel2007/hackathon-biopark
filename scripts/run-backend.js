@@ -15,7 +15,7 @@ const executable = fs.existsSync(python) ? python : win ? "python" : "python3";
 const child = spawn(
   executable,
   ["-m", "uvicorn", "app.main:app", "--reload", "--host", "127.0.0.1", "--port", "8000"],
-  { cwd: backendDir, stdio: "inherit", env: process.env, shell: win }
+  { cwd: backendDir, stdio: "inherit", env: process.env }
 );
 
 child.on("exit", (code) => process.exit(code ?? 1));
