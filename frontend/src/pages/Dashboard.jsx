@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   getDashboardData, downloadPdf, runAllQueries,
   getProtocols, createProtocol, updateProtocol, deleteProtocol,
-  bulkDeleteProtocols, runSingleQuery, importSpreadsheet,
+  bulkDeleteProtocols, runSingleQuery, previewSpreadsheet, confirmImport,
 } from '../services/api'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -52,6 +52,8 @@ export default function Dashboard() {
   const [formError,      setFormError]      = useState(null)
   const [pageError,      setPageError]      = useState(null)
   const [importing,      setImporting]      = useState(false)
+  const [confirming,     setConfirming]     = useState(false)
+  const [importPreview,  setImportPreview]  = useState(null)
   const [importResult,   setImportResult]   = useState(null)
   const [selected,       setSelected]       = useState(new Set())
   const [showBulkConfirm,setShowBulkConfirm]= useState(false)
@@ -162,11 +164,26 @@ export default function Dashboard() {
 
   async function handleImport(e) {
     const file = e.target.files[0]; if (!file) return
-    e.target.value = ''; setImporting(true); setImportResult(null)
+    e.target.value = ''; setImporting(true); setImportResult(null); setImportPreview(null)
     try {
-      const result = await importSpreadsheet(file); setImportResult(result)
-      qc.invalidateQueries(['protocols']); qc.invalidateQueries(['dashboard'])
+      const result = await previewSpreadsheet(file)
+      setImportPreview(result)
+    } catch (err) {
+      setPageError(err.response?.data?.detail || 'Erro ao processar planilha')
     } finally { setImporting(false) }
+  }
+
+  async function handleConfirmImport() {
+    if (!importPreview) return
+    setConfirming(true)
+    try {
+      const result = await confirmImport(importPreview.rows)
+      setImportResult(result)
+      setImportPreview(null)
+      qc.invalidateQueries(['protocols']); qc.invalidateQueries(['dashboard'])
+    } catch (err) {
+      setPageError(err.response?.data?.detail || 'Erro ao importar dados')
+    } finally { setConfirming(false) }
   }
 
   function toggleSelect(id) {
@@ -338,43 +355,43 @@ export default function Dashboard() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50/70">
-                  <th className="px-4 py-3 w-8">
+                  <th className="px-3 py-3 w-8">
                     <input type="checkbox" checked={filteredData.length > 0 && selected.size === filteredData.length} onChange={toggleSelectAll} className="rounded" />
                   </th>
                   {['Projeto','Protocolo','Atividade','Órgão','Status','Situação','Ativo','Duração','Mudança','Ações'].map(h => (
-                    <th key={h} className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">{h}</th>
+                    <th key={h} className="text-left px-3 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {filteredData.map(p => (
                   <tr key={p.id} className={`hover:bg-gray-50/70 transition-colors ${selected.has(p.id) ? 'bg-brand-50/60' : ''}`}>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-3">
                       <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggleSelect(p.id)} className="rounded" />
                     </td>
-                    <td className="px-4 py-3 font-medium text-gray-900 max-w-[130px] truncate">{p.projeto}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-gray-500">{p.protocolo}</td>
-                    <td className="px-4 py-3 text-gray-600 max-w-[150px] truncate">{p.atividade}</td>
-                    <td className="px-4 py-3 max-w-[120px]">
+                    <td className="px-3 py-3 font-medium text-gray-900 max-w-[120px] truncate">{p.projeto}</td>
+                    <td className="px-3 py-3 font-mono text-xs text-gray-500">{p.protocolo}</td>
+                    <td className="px-3 py-3 text-gray-600 max-w-[140px] truncate">{p.atividade}</td>
+                    <td className="px-3 py-3 max-w-[110px]">
                       <span className="text-xs text-gray-500 truncate block">{p.orgao_site_consultado}</span>
                     </td>
-                    <td className="px-4 py-3"><StatusBadge status={p.status} /></td>
-                    <td className="px-4 py-3 text-gray-400 text-xs">{p.situacao ?? <span className="text-gray-300">—</span>}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-3"><StatusBadge status={p.status} /></td>
+                    <td className="px-3 py-3 text-gray-400 text-xs">{p.situacao ?? <span className="text-gray-300">—</span>}</td>
+                    <td className="px-3 py-3">
                       {p.ativo
                         ? <span className="inline-flex text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full">Ativo</span>
                         : <span className="inline-flex text-xs text-gray-500 bg-gray-100 border border-gray-200 px-2 py-0.5 rounded-full">Inativo</span>
                       }
                     </td>
-                    <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">{p.duracao_dias != null ? `${p.duracao_dias}d` : '—'}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-3 text-gray-400 text-xs whitespace-nowrap">{p.duracao_dias != null ? `${p.duracao_dias}d` : '—'}</td>
+                    <td className="px-3 py-3">
                       {(mudancaMap[p.id] || p.houve_mudanca) && (
                         <span className="inline-flex items-center gap-1 text-xs bg-amber-50 text-amber-700 border border-amber-100 px-2 py-0.5 rounded-full">
                           <AlertTriangle size={10} /> Mudança
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-3 pr-4">
                       <div className="flex gap-0.5">
                         <button onClick={() => queryMut.mutate(p.id)} title="Consultar" className="p-1.5 text-brand-600 hover:bg-brand-50 rounded-lg transition"><RefreshCw size={13} /></button>
                         <button onClick={() => openEdit(p)} title="Editar" className="p-1.5 text-gray-500 hover:bg-gray-100 rounded-lg transition"><Pencil size={13} /></button>
@@ -427,7 +444,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ── Modal: Importando ── */}
+      {/* ── Modal: Processando planilha ── */}
       {importing && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl shadow-2xl px-10 py-10 flex flex-col items-center gap-4">
@@ -436,8 +453,109 @@ export default function Dashboard() {
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
             </svg>
             <div className="text-center">
-              <p className="text-gray-800 font-semibold">Importando planilha</p>
+              <p className="text-gray-800 font-semibold">Processando planilha</p>
               <p className="text-gray-400 text-sm mt-1">Isso pode levar alguns instantes...</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Preview de importação ── */}
+      {importPreview && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">Preview da Importação</h3>
+              <button onClick={() => setImportPreview(null)} className="text-gray-400 hover:text-gray-600 transition">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="px-6 py-3 bg-gray-50/70 border-b border-gray-100 flex gap-6 text-sm">
+              <span className="text-emerald-700 font-medium">{importPreview.rows.length} linha(s) para importar</span>
+              <span className="text-amber-700 font-medium">{importPreview.ignorados.length} ignorada(s)</span>
+              <span className="text-red-700 font-medium">{importPreview.erros.length} erro(s)</span>
+            </div>
+
+            <div className="flex-1 overflow-auto p-4 space-y-4">
+              {importPreview.rows.length === 0 ? (
+                <p className="text-gray-500 text-sm text-center py-8">Nenhuma linha válida encontrada para importar.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-gray-50/70 border-b border-gray-100 text-gray-400 text-left uppercase tracking-wider">
+                        {['Linha', 'Projeto', 'Protocolo', 'Atividade', 'Status', 'Abertura'].map(h => (
+                          <th key={h} className="px-3 py-2 font-medium whitespace-nowrap">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {importPreview.rows.map((row, i) => (
+                        <tr key={i} className="hover:bg-gray-50/70 transition-colors">
+                          <td className="px-3 py-2 font-mono text-gray-400 whitespace-nowrap">{row.linha}</td>
+                          <td className="px-3 py-2 font-medium text-gray-900 whitespace-nowrap">{row.projeto}</td>
+                          <td className="px-3 py-2 font-mono text-gray-500 whitespace-nowrap">{row.protocolo}</td>
+                          <td className="px-3 py-2 text-gray-600 max-w-xs truncate">{row.atividade}</td>
+                          <td className="px-3 py-2 whitespace-nowrap"><StatusBadge status={row.status} /></td>
+                          <td className="px-3 py-2 text-gray-400 whitespace-nowrap">{row.data_abertura}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {importPreview.ignorados.length > 0 && (
+                <details>
+                  <summary className="text-sm text-amber-700 cursor-pointer font-medium select-none">
+                    {importPreview.ignorados.length} linha(s) ignorada(s) — clique para ver
+                  </summary>
+                  <ul className="mt-2 space-y-1">
+                    {importPreview.ignorados.map((ig, i) => (
+                      <li key={i} className="flex gap-2 text-xs bg-amber-50 border border-amber-100 rounded-lg px-3 py-1.5">
+                        <span className="font-mono text-gray-400 whitespace-nowrap">{ig.linha}</span>
+                        <span className="text-amber-800">{ig.motivo}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+
+              {importPreview.erros.length > 0 && (
+                <details>
+                  <summary className="text-sm text-red-700 cursor-pointer font-medium select-none">
+                    {importPreview.erros.length} erro(s) de parsing — clique para ver
+                  </summary>
+                  <ul className="mt-2 space-y-1">
+                    {importPreview.erros.map((er, i) => (
+                      <li key={i} className="flex gap-2 text-xs bg-red-50 border border-red-100 rounded-lg px-3 py-1.5">
+                        <span className="font-mono text-gray-400 whitespace-nowrap">{er.linha}</span>
+                        <span className="text-red-800">{er.erro}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
+              <button
+                onClick={() => setImportPreview(null)}
+                disabled={confirming}
+                className="px-4 py-2 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmImport}
+                disabled={importPreview.rows.length === 0 || confirming}
+                className="px-4 py-2 text-sm bg-brand-700 hover:bg-brand-800 text-white rounded-lg disabled:opacity-50 transition font-medium"
+              >
+                {confirming
+                  ? 'Importando...'
+                  : `Confirmar importação (${importPreview.rows.length} linha${importPreview.rows.length !== 1 ? 's' : ''})`}
+              </button>
             </div>
           </div>
         </div>

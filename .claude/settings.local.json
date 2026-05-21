@@ -4,7 +4,8 @@
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\arthu\\\\Desktop\\\\hackathon-biopark\" -Force)",
       "Bash(Select-Object -Property Name, PSIsContainer)",
       "Bash(Format-Table -AutoSize)",
-      "Bash(npx vite *)"
+      "Bash(npx vite *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }
