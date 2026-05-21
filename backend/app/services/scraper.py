@@ -378,7 +378,8 @@ def _query_cartorios_pr_toledo(p: dict) -> dict:
 def _query_source(p: dict) -> dict:
     if _is_cartorios_pr_query(p):
         return _query_cartorios_pr_toledo(p)
-    return _mock_query(p)
+    from app.services.scrapers.dispatcher import check_protocol_status
+    return check_protocol_status(p)
 
 
 # ---------------------------------------------------------------------------
