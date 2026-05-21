@@ -4,6 +4,8 @@ import re
 import json
 import base64
 import unicodedata
+import asyncio
+import concurrent.futures
 
 from app.supabase_client import SupabaseClient
 from app.services.email_service import enviar_alerta
@@ -220,10 +222,124 @@ def _parse_cartorio_result(html: str, protocolo: str) -> tuple:
     return status, obs, data_mov
 
 
+async def _async_playwright_query(protocolo: str, orgao: str, url_salva: str) -> dict:
+    """Lógica do scraper usando async_playwright (executa em thread dedicada)."""
+    try:
+        from playwright.async_api import async_playwright, TimeoutError as PWTimeout
+    except ImportError:
+        return {"erro": "Playwright não instalado.", "screenshot_base64": None}
+
+    oficios = "2" if "2" in orgao else "1"
+    serventia_label = f"Toledo - {oficios}º Ofício"
+
+    nav_url = url_salva if (url_salva and "cartoriospr" in url_salva) else f"{_CARTORIOS_PR_URL}{protocolo}"
+
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(
+            headless=True,
+            args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
+        )
+        ctx = await browser.new_context(
+            viewport={"width": 1280, "height": 900},
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
+        )
+        page = await ctx.new_page()
+
+        # ── Navegação ──────────────────────────────────────────────────────
+        await page.goto(nav_url, wait_until="domcontentloaded", timeout=30000)
+        try:
+            await page.wait_for_load_state("networkidle", timeout=10000)
+        except PWTimeout:
+            pass
+
+        # Se cair no formulário (tem <select>), preencher manualmente
+        selects = page.locator("select")
+        if await selects.count() > 0:
+            # 1. Serventia
+            try:
+                await selects.first.select_option(label=serventia_label)
+            except Exception:
+                try:
+                    await selects.first.select_option(label=re.compile(rf"Toledo.*{oficios}", re.I))
+                except Exception:
+                    pass
+
+            # 2. Tipo: Protocolo de Registro/Averbações (2° radio)
+            radios = page.locator("input[type='radio']")
+            if await radios.count() > 1:
+                try:
+                    await radios.nth(1).check(force=True)
+                except Exception:
+                    pass
+
+            # 3. Número do protocolo
+            for sel in ["input[type='number']", "input[type='text']"]:
+                inputs = page.locator(sel)
+                if await inputs.count() > 0:
+                    try:
+                        await inputs.first.fill(protocolo)
+                        break
+                    except Exception:
+                        pass
+
+            # 4. Checkbox de termos
+            checkboxes = page.locator("input[type='checkbox']")
+            for i in range(await checkboxes.count()):
+                try:
+                    if not await checkboxes.nth(i).is_checked():
+                        await checkboxes.nth(i).check(force=True)
+                except Exception:
+                    pass
+
+            # 5. Clicar em Consultar
+            clicked = False
+            for btn_sel in ["button:has-text('Consultar')", "input[type='submit']", "button[type='submit']", "button"]:
+                btns = page.locator(btn_sel)
+                if await btns.count() > 0:
+                    try:
+                        await btns.last.click()
+                        clicked = True
+                        break
+                    except Exception:
+                        continue
+            if not clicked:
+                try:
+                    await page.locator("form").first.evaluate("f => f.submit()")
+                except Exception:
+                    pass
+
+            try:
+                await page.wait_for_load_state("networkidle", timeout=15000)
+            except PWTimeout:
+                pass
+            await page.wait_for_timeout(1500)
+        else:
+            await page.wait_for_timeout(1000)
+
+        # ── Screenshot e parse ─────────────────────────────────────────────
+        screenshot_bytes = await page.screenshot(full_page=True)
+        html = await page.content()
+        await browser.close()
+
+    screenshot_b64 = base64.b64encode(screenshot_bytes).decode()
+    status, obs, data_mov = _parse_cartorio_result(html, protocolo)
+
+    return {
+        "status_consultado":  status,
+        "situacao_consultada": None,
+        "observacao":         obs,
+        "texto_bruto":        html[:8000] if html else None,
+        "screenshot_base64":  screenshot_b64,
+        "data_movimentacao":  data_mov,
+        "fonte_consulta":     f"CARTÓRIO PR — {serventia_label}",
+        "erro":               None,
+    }
+
+
 def _query_cartorios_pr_toledo(p: dict) -> dict:
-    protocolo  = (p.get("protocolo") or "").strip()
-    orgao      = (p.get("orgao_site_consultado") or "").strip()
-    url_salva  = (p.get("url_consulta") or "").strip()
+    protocolo = (p.get("protocolo") or "").strip()
+    orgao     = (p.get("orgao_site_consultado") or "").strip()
+    url_salva = (p.get("url_consulta") or "").strip()
 
     if not protocolo:
         return {
@@ -237,147 +353,15 @@ def _query_cartorios_pr_toledo(p: dict) -> dict:
             "erro": "Número do protocolo não informado — consulta não realizada.",
         }
 
-    # 1° ou 2° Ofício
-    oficios = "2" if "2" in orgao else "1"
-    serventia_label = f"Toledo - {oficios}º Ofício"
-
     try:
-        from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
-    except ImportError:
-        return _mock_query(p)
-
-    try:
-        with sync_playwright() as pw:
-            browser = pw.chromium.launch(
-                headless=True,
-                args=[
-                    "--no-sandbox",
-                    "--disable-setuid-sandbox",
-                    "--disable-dev-shm-usage",
-                    "--disable-gpu",
-                ],
+        # Executa em thread dedicada com event loop próprio,
+        # evitando conflito com o event loop do FastAPI/uvicorn
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(
+                asyncio.run,
+                _async_playwright_query(protocolo, orgao, url_salva),
             )
-            ctx = browser.new_context(
-                viewport={"width": 1280, "height": 900},
-                user_agent=(
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/120.0.0.0 Safari/537.36"
-                ),
-            )
-            page = ctx.new_page()
-
-            # ── Navegação ──────────────────────────────────────────────────
-            # Se já temos URL com token direto, usamos ela; senão montamos
-            if url_salva and "cartoriospr" in url_salva:
-                nav_url = url_salva
-            else:
-                nav_url = f"{_CARTORIOS_PR_URL}{protocolo}"
-
-            page.goto(nav_url, wait_until="domcontentloaded", timeout=30000)
-            try:
-                page.wait_for_load_state("networkidle", timeout=10000)
-            except PWTimeout:
-                pass
-
-            # Verificar se caiu na tela do formulário (token vazio ou inválido)
-            # Se tiver select (formulário), preencher manualmente
-            selects = page.locator("select")
-            if selects.count() > 0:
-                # ── 1. Serventia ──────────────────────────────────────────
-                try:
-                    selects.first.select_option(label=serventia_label)
-                except Exception:
-                    try:
-                        selects.first.select_option(
-                            label=re.compile(rf"Toledo.*{oficios}", re.I)
-                        )
-                    except Exception:
-                        pass
-
-                # ── 2. Tipo: Protocolo de Registro/Averbações (2° radio) ──
-                radios = page.locator("input[type='radio']")
-                if radios.count() > 1:
-                    try:
-                        radios.nth(1).check(force=True)
-                    except Exception:
-                        pass
-
-                # ── 3. Número do protocolo ────────────────────────────────
-                filled = False
-                for sel in ["input[type='number']", "input[type='text']"]:
-                    inputs = page.locator(sel)
-                    if inputs.count() > 0:
-                        try:
-                            inputs.first.fill(protocolo)
-                            filled = True
-                            break
-                        except Exception:
-                            pass
-
-                # ── 4. Checkbox de termos ─────────────────────────────────
-                checkboxes = page.locator("input[type='checkbox']")
-                for i in range(checkboxes.count()):
-                    try:
-                        if not checkboxes.nth(i).is_checked():
-                            checkboxes.nth(i).check(force=True)
-                    except Exception:
-                        pass
-
-                # ── 5. Clicar em Consultar ────────────────────────────────
-                clicked = False
-                for btn_sel in [
-                    "button:has-text('Consultar')",
-                    "input[type='submit']",
-                    "button[type='submit']",
-                    "button",
-                ]:
-                    btns = page.locator(btn_sel)
-                    if btns.count() > 0:
-                        try:
-                            btns.last.click()
-                            clicked = True
-                            break
-                        except Exception:
-                            continue
-                if not clicked:
-                    try:
-                        page.locator("form").first.evaluate("f => f.submit()")
-                    except Exception:
-                        pass
-
-                # ── Aguardar resultado após submit ────────────────────────
-                try:
-                    page.wait_for_load_state("networkidle", timeout=15000)
-                except PWTimeout:
-                    pass
-                page.wait_for_timeout(1500)
-
-            else:
-                # Já está na página de resultado (URL com token direto)
-                page.wait_for_timeout(1000)
-
-            # ── 7. Screenshot do resultado (evidência) ────────────────────
-            screenshot_bytes = page.screenshot(full_page=True)
-            screenshot_b64   = base64.b64encode(screenshot_bytes).decode()
-
-            # ── 8. Parsear resultado ──────────────────────────────────────
-            html   = page.content()
-            status, obs, data_mov = _parse_cartorio_result(html, protocolo)
-
-            browser.close()
-
-        return {
-            "status_consultado":  status,
-            "situacao_consultada": None,
-            "observacao":         obs,
-            "texto_bruto":        html[:8000] if html else None,
-            "screenshot_base64":  screenshot_b64,
-            "data_movimentacao":  data_mov,
-            "fonte_consulta":     f"CARTÓRIO PR — {serventia_label}",
-            "erro":               None,
-        }
-
+            return future.result(timeout=90)
     except Exception as exc:
         return {
             "status_consultado":  None,
