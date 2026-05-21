@@ -152,7 +152,21 @@ export default function Dashboard() {
     if (!form.atividade?.trim())             return setFormError('Atividade é obrigatória')
     if (!form.orgao_site_consultado?.trim()) return setFormError('Órgão / Site é obrigatório')
     if (!form.data_abertura)                 return setFormError('Data de Abertura é obrigatória')
-    setFormError(null); saveMut.mutate(form)
+    setFormError(null)
+    const payload = {
+      status:                form.status,
+      projeto:               form.projeto,
+      protocolo:             form.protocolo,
+      atividade:             form.atividade,
+      orgao_site_consultado: form.orgao_site_consultado,
+      atribuido_a:           form.atribuido_a   || null,
+      data_abertura:         form.data_abertura,
+      data_finalizacao:      form.data_finalizacao || null,
+      situacao:              form.situacao      || null,
+      ativo:                 form.ativo,
+      url_consulta:          form.url_consulta  || null,
+    }
+    saveMut.mutate(payload)
   }
 
   function openEdit(item) {

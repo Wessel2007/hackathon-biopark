@@ -1,7 +1,7 @@
 from datetime import date, datetime
 import json
 from typing import Optional, List
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 
 
 class ProtocolBase(BaseModel):
@@ -34,6 +34,15 @@ class ProtocolUpdate(BaseModel):
     situacao: Optional[str] = None
     ativo: Optional[bool] = None
     url_consulta: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def clean_empty_dates(cls, data):
+        if isinstance(data, dict):
+            for key in ("data_abertura", "data_finalizacao"):
+                if data.get(key) == "":
+                    data[key] = None
+        return data
 
 
 class QueryHistoryOut(BaseModel):

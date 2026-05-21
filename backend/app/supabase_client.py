@@ -5,7 +5,7 @@ from app.config import settings
 
 HEADERS = {
     "apikey": settings.supabase_anon_key,
-    "Authorization": f"Bearer {settings.supabase_anon_key}",
+    "Authorization": f"Bearer {settings.supabase_service_key}",
     "Content-Type": "application/json",
     "Prefer": "return=representation",
 }
