@@ -565,8 +565,8 @@ export default function Protocols() {
                   <th className="px-4 py-3 w-8">
                     <input type="checkbox" checked={filteredData.length > 0 && selected.size === filteredData.length} onChange={toggleSelectAll} className="rounded" />
                   </th>
-                  {['Projeto', 'Protocolo', 'Atividade', 'Órgão', 'Status', 'Situação', 'Ativo', 'Duração', 'Ações'].map(h => (
-                    <th key={h} className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">{h}</th>
+                  {['Projeto', 'Protocolo', 'Atividade', 'Órgão', 'Status', 'Situação', 'Ativo', 'Atribuído a', 'Data Abertura', 'Data Finalização', 'URL', 'Duração', 'Ações'].map(h => (
+                    <th key={h} className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -583,14 +583,20 @@ export default function Protocols() {
                       <span className="text-xs text-gray-500 truncate block">{p.orgao_site_consultado}</span>
                     </td>
                     <td className="px-4 py-3"><StatusBadge status={p.status} /></td>
-                    <td className="px-4 py-3 text-gray-400 text-xs">{p.situacao ?? <span className="text-gray-300">—</span>}</td>
+                    <td className="px-4 py-3 text-gray-400 text-xs">{fmt(p.situacao)}</td>
                     <td className="px-4 py-3">
                       {p.ativo
                         ? <span className="inline-flex text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full">Ativo</span>
                         : <span className="inline-flex text-xs text-gray-500 bg-gray-100 border border-gray-200 px-2 py-0.5 rounded-full">Inativo</span>
                       }
                     </td>
-                    <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">{p.duracao_dias != null ? `${p.duracao_dias}d` : '—'}</td>
+                    <td className="px-4 py-3 text-gray-400 text-xs max-w-[120px] truncate">{fmt(p.atribuido_a)}</td>
+                    <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">{fmt(p.data_abertura)}</td>
+                    <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">{fmt(p.data_finalizacao)}</td>
+                    <td className="px-4 py-3 text-xs max-w-[140px] truncate">
+                      {fmtUrl(p.url_consulta)}
+                    </td>
+                    <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">{calcDuracao(p.data_abertura, p.data_finalizacao)}</td>
                     <td className="px-4 py-3">
                       <div className="flex gap-0.5">
                         <button onClick={() => queryMut.mutate(p.id)} title="Consultar" className="p-1.5 text-brand-600 hover:bg-brand-50 rounded-lg transition"><RefreshCw size={13} /></button>
@@ -607,6 +613,40 @@ export default function Protocols() {
       </div>
     </div>
   )
+}
+
+function fmt(val) {
+  if (val == null) return '-'
+  const s = String(val).trim()
+  if (s === '' || s.toLowerCase() === 'nan') return '-'
+  return s
+}
+
+function fmtUrl(val) {
+  const s = fmt(val)
+  if (s === '-') return <span className="text-gray-300">-</span>
+  return (
+    <a href={s} target="_blank" rel="noopener noreferrer" title={s}
+      className="text-brand-600 hover:underline truncate block max-w-[140px]">
+      {s.replace(/^https?:\/\//, '')}
+    </a>
+  )
+}
+
+function calcDuracao(data_abertura, data_finalizacao) {
+  const a = fmt(data_abertura)
+  if (a === '-') return '-'
+  try {
+    const abertura = new Date(a)
+    if (isNaN(abertura.getTime())) return '-'
+    const fim = data_finalizacao && fmt(data_finalizacao) !== '-'
+      ? new Date(data_finalizacao)
+      : new Date()
+    const dias = Math.max(0, Math.floor((fim - abertura) / 86400000))
+    return `${dias}d`
+  } catch {
+    return '-'
+  }
 }
 
 function StatusBadge({ status }) {
