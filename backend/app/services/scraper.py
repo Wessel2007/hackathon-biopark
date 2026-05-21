@@ -124,6 +124,18 @@ def _is_cartorios_pr_query(p: dict) -> bool:
     )
 
 
+# Scraper real - COPEL Distribuição (acompanhamento de solicitações)
+def _is_copel_distribuicao_query(p: dict) -> bool:
+    """Retorna True para consultas no portal público de acompanhamento da COPEL."""
+    url = (p.get("url_consulta") or "").lower()
+    orgao = _normalize(p.get("orgao_site_consultado") or "")
+    url_copel = (
+        "acompanhamento-de-solicitacoes" in url
+        or "slwweb/publico/acompanhamento" in url
+    )
+    return url_copel or (("copel" in orgao) and url_copel)
+
+
 # Scraper real - ePROTOCOLO PR (Corpo de Bombeiros do Paraná / CBPR)
 def _is_eprotocolo_cbpr_query(p: dict) -> bool:
     """Retorna True para consultas de protocolo do CBPR no portal ePROTOCOLO."""
@@ -413,6 +425,11 @@ def _query_source(p: dict) -> dict:
     if _is_equiplano_toledo_carmel_query(p):
         from app.services.scrapers.dispatcher import _to_internal
         from app.services.scrapers.equiplano_toledo import query_protocol
+
+        return _to_internal(query_protocol(p))
+    if _is_copel_distribuicao_query(p):
+        from app.services.scrapers.dispatcher import _to_internal
+        from app.services.scrapers.copel_distribuicao import query_protocol
 
         return _to_internal(query_protocol(p))
     if _is_eprotocolo_cbpr_query(p):

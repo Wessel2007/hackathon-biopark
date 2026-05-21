@@ -43,6 +43,13 @@ def _select_scraper(orgao: str, url: str):
     """Seleciona a função query() do scraper correto."""
     norm = _norm(orgao)
 
+    if (
+        "acompanhamento-de-solicitacoes" in url
+        or "slwweb/publico/acompanhamento" in url
+    ):
+        from app.services.scrapers.copel_distribuicao import query
+        return query
+
     if "copel" in norm or "copel" in url:
         from app.services.scrapers.copel import query
         return query

@@ -1,9 +1,10 @@
 """
-Scraper para COPEL (Companhia Paranaense de Energia).
+Scraper simulado para COPEL (Companhia Paranaense de Energia).
 
-O portal da COPEL (copel.com) exige autenticação para consulta de protocolo,
-tornando scraping direto inviável. Este módulo simula o fluxo de consulta
-de solicitações de ligação/ampliação elétrica.
+Consultas reais no acompanhamento de solicitações (copel.com / slwweb) são feitas
+por ``copel_distribuicao.py`` quando a URL aponta para esse portal.
+
+Este módulo cobre demais fluxos da COPEL onde ainda não há automação.
 """
 
 import random
