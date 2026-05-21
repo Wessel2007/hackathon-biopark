@@ -23,6 +23,7 @@ export default function Protocols() {
   const [importResult, setImportResult] = useState(null)
   const [selected, setSelected] = useState(new Set())
   const [showBulkConfirm, setShowBulkConfirm] = useState(false)
+  const [queryResult, setQueryResult] = useState(null)
 
   const { data = [], isLoading } = useQuery({
     queryKey: ['protocols', filterProjeto],
@@ -65,7 +66,10 @@ export default function Protocols() {
 
   const queryMut = useMutation({
     mutationFn: (id) => runSingleQuery(id),
-    onSuccess: () => qc.invalidateQueries(['protocols']),
+    onSuccess: (data) => {
+      qc.invalidateQueries(['protocols'])
+      setQueryResult(data)
+    },
   })
 
   const bulkDelMut = useMutation({
@@ -257,6 +261,51 @@ export default function Protocols() {
               <button onClick={() => setShowBulkConfirm(true)}
                 className="flex items-center gap-1 text-sm px-3 py-1.5 bg-red-600 text-white rounded hover:bg-red-700">
                 <Trash2 size={13} /> Excluir selecionados
+              </button>
+            </div>
+          </div>
+        )}
+
+        {queryResult && (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl shadow-xl p-6 w-[420px] max-h-[80vh] overflow-y-auto flex flex-col gap-3">
+              <h3 className="text-base font-semibold text-gray-800">
+                Resultado da Consulta — <span className="font-mono">{queryResult.protocolo}</span>
+              </h3>
+
+              {queryResult.resultado?.erro ? (
+                <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">
+                  {queryResult.mudancas_detectadas?.[0] ?? queryResult.resultado.erro}
+                </div>
+              ) : queryResult.mudancas_detectadas?.length > 0 ? (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-amber-600">Mudanças detectadas</p>
+                  <ul className="space-y-1">
+                    {queryResult.mudancas_detectadas.map((m, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm text-gray-700 bg-amber-50 border border-amber-100 rounded px-3 py-2">
+                        <span className="text-amber-500 font-bold mt-0.5">!</span>
+                        {m}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <p className="text-sm text-green-700 bg-green-50 border border-green-100 rounded px-3 py-2">
+                  Nenhuma mudança detectada em relação à última consulta.
+                </p>
+              )}
+
+              {queryResult.resultado?.status_consultado && (
+                <p className="text-xs text-gray-400">
+                  Status atual: <span className="font-medium text-gray-600">{queryResult.resultado.status_consultado}</span>
+                </p>
+              )}
+
+              <button
+                onClick={() => setQueryResult(null)}
+                className="mt-1 self-end text-sm px-4 py-2 bg-brand-700 text-white rounded-lg hover:bg-brand-900"
+              >
+                OK
               </button>
             </div>
           </div>

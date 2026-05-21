@@ -1,6 +1,7 @@
 from datetime import date, datetime
+import json
 from typing import Optional, List
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 class ProtocolBase(BaseModel):
@@ -43,6 +44,18 @@ class QueryHistoryOut(BaseModel):
     houve_mudanca: bool
     erro: Optional[str]
     data_consulta: datetime
+    data_movimentacao: Optional[str] = None
+    mudancas_detectadas: Optional[List[str]] = None
+
+    @field_validator("mudancas_detectadas", mode="before")
+    @classmethod
+    def parse_mudancas(cls, v):
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except (json.JSONDecodeError, ValueError):
+                return None
+        return v
 
     class Config:
         from_attributes = True
