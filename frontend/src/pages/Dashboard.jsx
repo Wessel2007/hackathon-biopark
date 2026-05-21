@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import AgentChat from '../components/AgentChat'
 import { useToast } from '../components/Toast'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -65,6 +65,8 @@ export default function Dashboard() {
   const [showBulkConfirm, setShowBulkConfirm] = useState(false)
   const [queryResult,     setQueryResult]     = useState(null)
   const [historyItem,     setHistoryItem]     = useState(null)
+  const [showNotifs,      setShowNotifs]      = useState(false)
+  const notifRef = useRef(null)
 
   /* ─── queries ─── */
   const { data: dashData } = useQuery({
@@ -102,6 +104,39 @@ export default function Dashboard() {
   const totalActive = (dashData?.ativos ?? 0)
   const totalAll = (dashData?.total ?? protocols.length)
   const mudancasHoje = (dashData?.com_mudanca_recente ?? 0)
+
+  const notificacoesAtivas = useMemo(() => {
+    const items = []
+    Object.values(dashData?.por_projeto ?? {}).flat().forEach(p => {
+      if (!p.houve_mudanca) return
+      const full = protocols.find(pr => pr.id === p.id)
+      items.push({
+        id: p.id,
+        protocolo: p.protocolo,
+        projeto: full?.projeto ?? p.projeto,
+        status: p.status,
+        situacao: p.situacao ?? full?.situacao,
+        ultima_consulta: p.ultima_consulta ?? full?.ultima_consulta,
+      })
+    })
+    return items.sort((a, b) => (b.ultima_consulta || '').localeCompare(a.ultima_consulta || ''))
+  }, [dashData, protocols])
+
+  useEffect(() => {
+    if (!showNotifs) return
+    function onPointerDown(e) {
+      if (notifRef.current && !notifRef.current.contains(e.target)) setShowNotifs(false)
+    }
+    function onKeyDown(e) {
+      if (e.key === 'Escape') setShowNotifs(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [showNotifs])
 
   /* ─── mutations ─── */
   function invalidateAll() {
@@ -243,14 +278,95 @@ export default function Dashboard() {
           </nav>
         </div>
         <div className="flex items-center gap-2">
-          <button className="relative w-9 h-9 rounded-lg flex items-center justify-center bg-paper hover:bg-line transition">
-            <Bell size={14} className="text-ink" />
-            {mudancasHoje > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full text-[9px] font-bold flex items-center justify-center text-white bg-accent-red">
-                {mudancasHoje}
-              </span>
+          <div ref={notifRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setShowNotifs(v => !v)}
+              aria-expanded={showNotifs}
+              aria-haspopup="true"
+              title="Notificações"
+              className={`relative w-9 h-9 rounded-lg flex items-center justify-center transition ${
+                showNotifs ? 'bg-line text-ink' : 'bg-paper hover:bg-line text-ink'
+              }`}
+            >
+              <Bell size={14} className="shrink-0" />
+              {mudancasHoje > 0 && (
+                <span className="pointer-events-none absolute -top-1 -right-1 min-w-[15px] h-[15px] px-0.5 rounded-full text-[8px] font-bold leading-none flex items-center justify-center text-white bg-accent-red ring-2 ring-surface">
+                  {mudancasHoje > 9 ? '9+' : mudancasHoje}
+                </span>
+              )}
+            </button>
+            {showNotifs && (
+              <div className="absolute right-0 top-full mt-2 w-[min(100vw-2rem,360px)] rounded-xl border border-line-2 bg-surface shadow-lg z-50 overflow-hidden">
+                <div className="px-4 py-3 border-b border-line flex items-center justify-between">
+                  <span className="text-sm font-semibold">Notificações</span>
+                  {mudancasHoje > 0 && (
+                    <span className="text-[10px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded bg-lime-soft text-lime-deep">
+                      {mudancasHoje} nova{mudancasHoje !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </div>
+                <div className="max-h-80 overflow-y-auto">
+                  {notificacoesAtivas.length === 0 ? (
+                    <div className="px-4 py-8 text-center text-sm text-muted">
+                      <CheckCircle2 size={20} className="mx-auto mb-2 text-emerald-500 opacity-80" />
+                      Nenhuma mudança pendente
+                    </div>
+                  ) : (
+                    <ul className="divide-y divide-line">
+                      {notificacoesAtivas.map(n => (
+                        <li key={n.id}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSearchQuery(n.protocolo)
+                              setShowNotifs(false)
+                            }}
+                            className="w-full text-left px-4 py-3 hover:bg-paper transition"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                                  <span className="font-mono text-xs font-medium">{n.protocolo}</span>
+                                  <span className="pill bg-lime-soft text-lime-deep text-[10px]">mudança</span>
+                                </div>
+                                <div className="text-xs text-muted truncate">{n.projeto}</div>
+                                {(n.situacao || n.status) && (
+                                  <div className="text-sm text-ink-2 mt-1 line-clamp-2">
+                                    {n.situacao || n.status}
+                                  </div>
+                                )}
+                              </div>
+                              {n.ultima_consulta && (
+                                <span className="text-[10px] font-mono uppercase tracking-wider text-muted shrink-0">
+                                  {new Date(n.ultima_consulta).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                {(dashData?.alertas_recentes?.length ?? 0) > 0 && (
+                  <div className="px-4 py-2 border-t border-line bg-paper">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        localStorage.removeItem('reports_token')
+                        navigate('/reports-login')
+                        setShowNotifs(false)
+                      }}
+                      className="text-xs text-muted hover:text-ink transition w-full text-left"
+                    >
+                      Ver histórico completo em Relatórios →
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
-          </button>
+          </div>
           <button onClick={handleLogout} title="Sair" className="w-9 h-9 rounded-lg flex items-center justify-center bg-paper hover:bg-line transition text-ink">
             <LogOut size={14} />
           </button>
