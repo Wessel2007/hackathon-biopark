@@ -483,21 +483,6 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ═══ Consulta real vs simulada ═══ */}
-        <details className="rounded-xl mb-4 bg-sky-50/80 border border-sky-100 text-sm">
-          <summary className="px-4 py-3 cursor-pointer font-medium text-sky-900 select-none">
-            Consultas aos órgãos — real vs. simulado
-          </summary>
-          <div className="px-4 pb-3 text-sky-800/90 text-xs leading-relaxed space-y-2">
-            <p>
-              Consulta <strong>real</strong> apenas para <strong>Cartório de Imóveis (PR)</strong> via cartoriospr.com.br.
-              Demais órgãos (COPEL, SANEPAR, Bombeiros, SEMA/IAT, Caixa, Prefeitura) usam <strong>simulação controlada</strong>;
-              o campo <code className="font-mono bg-white/60 px-1 rounded">fonte_consulta</code> no histórico indica <code className="font-mono">SIMULADO:</code>.
-            </p>
-            <p className="text-sky-700/80">Detalhes no README do repositório, seção &quot;Consultas aos órgãos&quot;.</p>
-          </div>
-        </details>
-
         {/* ═══ Filters ═══ */}
         <div className="flex items-center gap-2 mb-4 flex-wrap">
           <div className="relative flex-1 min-w-[260px]">
