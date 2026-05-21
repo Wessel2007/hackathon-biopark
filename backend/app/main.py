@@ -1,10 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.database import engine, Base
 from app.routers import auth, protocols, import_data, scraping, reports
-
-Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Biopark - Protocolos", version="1.0.0")
 

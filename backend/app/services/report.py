@@ -3,43 +3,55 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
-from sqlalchemy.orm import Session
+from supabase import Client
 import io
 
-from app.models.protocol import Protocol
 
+def generate_pdf_report(sb: Client) -> bytes:
+    protocols = sb.table("protocols").select("*, query_history(*)").order("projeto").execute().data
 
-def generate_pdf_report(db: Session) -> bytes:
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
     styles = getSampleStyleSheet()
-    story = []
-
     title_style = ParagraphStyle("title", parent=styles["Heading1"], fontSize=16, textColor=colors.HexColor("#1a365d"))
     h2_style = ParagraphStyle("h2", parent=styles["Heading2"], fontSize=12, textColor=colors.HexColor("#2b6cb0"))
 
+    story = []
     story.append(Paragraph("Relatório de Protocolos por Empreendimento", title_style))
     story.append(Paragraph(f"Gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M')}", styles["Normal"]))
     story.append(HRFlowable(width="100%", thickness=1, color=colors.grey))
     story.append(Spacer(1, 12))
 
-    protocols = db.query(Protocol).order_by(Protocol.projeto, Protocol.protocolo).all()
     por_projeto: dict = {}
     for p in protocols:
-        por_projeto.setdefault(p.projeto, []).append(p)
+        por_projeto.setdefault(p["projeto"], []).append(p)
 
     for projeto, items in por_projeto.items():
         story.append(Paragraph(f"Empreendimento: {projeto}", h2_style))
-
         table_data = [["Protocolo", "Atividade", "Status", "Situação", "Duração (dias)", "Última Consulta", "Mudança"]]
         for p in items:
-            fim = p.data_finalizacao or date.today()
-            duracao = (fim - p.data_abertura).days if p.data_abertura else "-"
-            ultima = p.ultima_consulta.strftime("%d/%m/%Y") if p.ultima_consulta else "-"
-            mudanca = "Sim" if (p.historico and p.historico[-1].houve_mudanca) else "Não"
+            abertura = p.get("data_abertura")
+            fim = p.get("data_finalizacao")
+            duracao = "-"
+            if abertura:
+                d_abertura = date.fromisoformat(abertura)
+                d_fim = date.fromisoformat(fim) if fim else date.today()
+                duracao = str((d_fim - d_abertura).days)
+
+            ultima = p.get("ultima_consulta")
+            ultima_str = datetime.fromisoformat(ultima).strftime("%d/%m/%Y") if ultima else "-"
+
+            historico = p.get("query_history") or []
+            mudanca = "Sim" if (historico and historico[-1].get("houve_mudanca")) else "Não"
+
             table_data.append([
-                p.protocolo, p.atividade[:30], p.status,
-                p.situacao or "-", str(duracao), ultima, mudanca,
+                p["protocolo"],
+                (p.get("atividade") or "")[:30],
+                p["status"],
+                p.get("situacao") or "-",
+                duracao,
+                ultima_str,
+                mudanca,
             ])
 
         t = Table(table_data, repeatRows=1)

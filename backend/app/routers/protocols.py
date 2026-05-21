@@ -1,89 +1,93 @@
 from datetime import date
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from supabase import Client
 
-from app.database import get_db
-from app.models.protocol import Protocol
-from app.schemas.protocol import ProtocolCreate, ProtocolUpdate, ProtocolOut
+from app.supabase_client import get_supabase
+from app.schemas.protocol import ProtocolCreate, ProtocolUpdate
 from app.routers.deps import get_current_user
 
 router = APIRouter(prefix="/protocols", tags=["protocols"])
 
 
-def _add_duracao(p: Protocol) -> dict:
-    data = ProtocolOut.from_orm(p).dict()
-    fim = p.data_finalizacao or date.today()
-    data["duracao_dias"] = (fim - p.data_abertura).days if p.data_abertura else None
-    return data
+def _add_duracao(p: dict) -> dict:
+    abertura = p.get("data_abertura")
+    fim = p.get("data_finalizacao")
+    if abertura:
+        d_abertura = date.fromisoformat(abertura)
+        d_fim = date.fromisoformat(fim) if fim else date.today()
+        p["duracao_dias"] = (d_fim - d_abertura).days
+    else:
+        p["duracao_dias"] = None
+    return p
 
 
-@router.get("/", response_model=List[ProtocolOut])
+@router.get("/")
 def list_protocols(
     projeto: Optional[str] = Query(None),
     ativo: Optional[bool] = Query(None),
     status: Optional[str] = Query(None),
     skip: int = 0,
     limit: int = 100,
-    db: Session = Depends(get_db),
+    sb: Client = Depends(get_supabase),
     _: str = Depends(get_current_user),
 ):
-    q = db.query(Protocol)
+    q = sb.table("protocols").select("*, query_history(*)")
     if projeto:
-        q = q.filter(Protocol.projeto.ilike(f"%{projeto}%"))
+        q = q.ilike("projeto", f"%{projeto}%")
     if ativo is not None:
-        q = q.filter(Protocol.ativo == ativo)
+        q = q.eq("ativo", ativo)
     if status:
-        q = q.filter(Protocol.status == status)
-    return [_add_duracao(p) for p in q.offset(skip).limit(limit).all()]
+        q = q.eq("status", status)
+    result = q.range(skip, skip + limit - 1).order("projeto").execute()
+    return [_add_duracao(p) for p in result.data]
 
 
-@router.get("/{protocol_id}", response_model=ProtocolOut)
-def get_protocol(protocol_id: int, db: Session = Depends(get_db), _: str = Depends(get_current_user)):
-    p = db.query(Protocol).filter(Protocol.id == protocol_id).first()
-    if not p:
+@router.get("/{protocol_id}")
+def get_protocol(protocol_id: int, sb: Client = Depends(get_supabase), _: str = Depends(get_current_user)):
+    result = sb.table("protocols").select("*, query_history(*)").eq("id", protocol_id).maybe_single().execute()
+    if not result.data:
         raise HTTPException(status_code=404, detail="Protocolo não encontrado")
-    return _add_duracao(p)
+    return _add_duracao(result.data)
 
 
-@router.post("/", response_model=ProtocolOut, status_code=201)
-def create_protocol(body: ProtocolCreate, db: Session = Depends(get_db), _: str = Depends(get_current_user)):
-    existing = db.query(Protocol).filter(
-        Protocol.projeto == body.projeto, Protocol.protocolo == body.protocolo
-    ).first()
-    if existing:
+@router.post("/", status_code=201)
+def create_protocol(body: ProtocolCreate, sb: Client = Depends(get_supabase), _: str = Depends(get_current_user)):
+    existing = sb.table("protocols").select("id").eq("projeto", body.projeto).eq("protocolo", body.protocolo).execute()
+    if existing.data:
         raise HTTPException(status_code=409, detail="Protocolo já cadastrado para este projeto")
-    p = Protocol(**body.dict())
-    db.add(p)
-    db.commit()
-    db.refresh(p)
-    return _add_duracao(p)
+    payload = body.dict()
+    for k, v in payload.items():
+        if hasattr(v, "isoformat"):
+            payload[k] = v.isoformat()
+    result = sb.table("protocols").insert(payload).execute()
+    return _add_duracao(result.data[0])
 
 
-@router.patch("/{protocol_id}", response_model=ProtocolOut)
+@router.patch("/{protocol_id}")
 def update_protocol(
-    protocol_id: int, body: ProtocolUpdate, db: Session = Depends(get_db), _: str = Depends(get_current_user)
+    protocol_id: int, body: ProtocolUpdate, sb: Client = Depends(get_supabase), _: str = Depends(get_current_user)
 ):
-    p = db.query(Protocol).filter(Protocol.id == protocol_id).first()
-    if not p:
+    existing = sb.table("protocols").select("id").eq("id", protocol_id).maybe_single().execute()
+    if not existing.data:
         raise HTTPException(status_code=404, detail="Protocolo não encontrado")
-    for field, value in body.dict(exclude_unset=True).items():
-        setattr(p, field, value)
-    db.commit()
-    db.refresh(p)
-    return _add_duracao(p)
+    payload = {k: v for k, v in body.dict(exclude_unset=True).items()}
+    for k, v in payload.items():
+        if hasattr(v, "isoformat"):
+            payload[k] = v.isoformat()
+    result = sb.table("protocols").update(payload).eq("id", protocol_id).execute()
+    return _add_duracao(result.data[0])
 
 
 @router.delete("/{protocol_id}", status_code=204)
-def delete_or_inactivate_protocol(
-    protocol_id: int, force: bool = False, db: Session = Depends(get_db), _: str = Depends(get_current_user)
+def delete_protocol(
+    protocol_id: int, force: bool = False, sb: Client = Depends(get_supabase), _: str = Depends(get_current_user)
 ):
-    p = db.query(Protocol).filter(Protocol.id == protocol_id).first()
-    if not p:
+    existing = sb.table("protocols").select("id").eq("id", protocol_id).maybe_single().execute()
+    if not existing.data:
         raise HTTPException(status_code=404, detail="Protocolo não encontrado")
-    if p.historico and not force:
-        p.ativo = False
-        db.commit()
+    history = sb.table("query_history").select("id").eq("protocol_id", protocol_id).limit(1).execute()
+    if history.data and not force:
+        sb.table("protocols").update({"ativo": False}).eq("id", protocol_id).execute()
     else:
-        db.delete(p)
-        db.commit()
+        sb.table("protocols").delete().eq("id", protocol_id).execute()

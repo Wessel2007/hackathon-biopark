@@ -1,19 +1,14 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import httpx
 from bs4 import BeautifulSoup
-from sqlalchemy.orm import Session
-
-from app.models.protocol import Protocol, QueryHistory
+from supabase import Client
 
 
 def _scrape_url(url: str) -> dict:
-    """Tenta acessar o site e extrair informações. Retorna dict com status/observacao/erro."""
     try:
         r = httpx.get(url, timeout=15, follow_redirects=True)
         r.raise_for_status()
         soup = BeautifulSoup(r.text, "html.parser")
-
-        # Heurística básica — adaptar conforme o site real
         texto = soup.get_text(separator=" ", strip=True)
         return {
             "status_consultado": _extract_status(texto),
@@ -22,76 +17,66 @@ def _scrape_url(url: str) -> dict:
             "erro": None,
         }
     except Exception as e:
-        return {
-            "status_consultado": None,
-            "observacao": None,
-            "texto_bruto": None,
-            "erro": str(e),
-        }
+        return {"status_consultado": None, "observacao": None, "texto_bruto": None, "erro": str(e)}
 
 
 def _extract_status(texto: str) -> str:
-    """Heurística simples de extração de status — adaptar por órgão."""
-    texto_lower = texto.lower()
-    if "aprovado" in texto_lower or "deferido" in texto_lower:
+    t = texto.lower()
+    if "aprovado" in t or "deferido" in t:
         return "APRO"
-    if "indeferido" in texto_lower or "reprovado" in texto_lower:
+    if "indeferido" in t or "reprovado" in t:
         return "REPROVADO"
-    if "análise" in texto_lower or "andamento" in texto_lower:
+    if "análise" in t or "andamento" in t:
         return "EM ANDAMENTO"
-    if "aguardando" in texto_lower:
+    if "aguardando" in t:
         return "AGUARDANDO DOCUMENTACAO"
-    if "cancelado" in texto_lower:
+    if "cancelado" in t:
         return "CANCELADO"
     return "PENDENTE"
 
 
-def _simulate_query(p: Protocol) -> dict:
-    """Simula uma consulta quando não há URL ou o site está inacessível."""
+def _simulate_query(p: dict) -> dict:
     return {
-        "status_consultado": p.status,
-        "observacao": f"[SIMULADO] Protocolo {p.protocolo} - {p.situacao}",
+        "status_consultado": p.get("status"),
+        "observacao": f"[SIMULADO] Protocolo {p.get('protocolo')} - {p.get('situacao')}",
         "texto_bruto": None,
         "erro": None,
     }
 
 
-def run_single_query(protocol_id: int, db: Session) -> dict:
-    p = db.query(Protocol).filter(Protocol.id == protocol_id).first()
+def run_single_query(protocol_id: int, sb: Client) -> dict:
+    result = sb.table("protocols").select("*, query_history(*)").eq("id", protocol_id).maybe_single().execute()
+    p = result.data
     if not p:
         return {"erro": "Protocolo não encontrado"}
 
-    if p.url_consulta:
-        resultado = _scrape_url(p.url_consulta)
-    else:
-        resultado = _simulate_query(p)
+    resultado = _scrape_url(p["url_consulta"]) if p.get("url_consulta") else _simulate_query(p)
 
-    ultimo = p.historico[-1] if p.historico else None
-    houve_mudanca = bool(
-        ultimo and ultimo.status_consultado != resultado["status_consultado"]
-    )
+    historico = p.get("query_history") or []
+    ultimo = historico[-1] if historico else None
+    houve_mudanca = bool(ultimo and ultimo.get("status_consultado") != resultado["status_consultado"])
 
-    history = QueryHistory(
-        protocol_id=p.id,
-        status_consultado=resultado["status_consultado"],
-        observacao=resultado["observacao"],
-        texto_bruto=resultado["texto_bruto"],
-        houve_mudanca=houve_mudanca,
-        erro=resultado["erro"],
-        data_consulta=datetime.utcnow(),
-    )
-    db.add(history)
+    now = datetime.now(timezone.utc).isoformat()
 
-    p.ultima_consulta = datetime.utcnow()
-    p.observacao_consulta = resultado["observacao"]
+    sb.table("query_history").insert({
+        "protocol_id": protocol_id,
+        "status_consultado": resultado["status_consultado"],
+        "observacao": resultado["observacao"],
+        "texto_bruto": resultado["texto_bruto"],
+        "houve_mudanca": houve_mudanca,
+        "erro": resultado["erro"],
+        "data_consulta": now,
+    }).execute()
+
+    update_payload = {"ultima_consulta": now, "observacao_consulta": resultado["observacao"]}
     if resultado["status_consultado"] and not resultado["erro"]:
-        p.status = resultado["status_consultado"]
+        update_payload["status"] = resultado["status_consultado"]
+    sb.table("protocols").update(update_payload).eq("id", protocol_id).execute()
 
-    db.commit()
-    return {"protocolo": p.protocolo, "resultado": resultado, "houve_mudanca": houve_mudanca}
+    return {"protocolo": p["protocolo"], "resultado": resultado, "houve_mudanca": houve_mudanca}
 
 
-def run_all_queries(db: Session):
-    protocols = db.query(Protocol).filter(Protocol.ativo == True).all()
+def run_all_queries(sb: Client):
+    protocols = sb.table("protocols").select("id").eq("ativo", True).execute().data
     for p in protocols:
-        run_single_query(p.id, db)
+        run_single_query(p["id"], sb)

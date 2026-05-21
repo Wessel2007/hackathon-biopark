@@ -1,9 +1,10 @@
+from datetime import date
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session
+from supabase import Client
 import io
 
-from app.database import get_db
+from app.supabase_client import get_supabase
 from app.services.report import generate_pdf_report
 from app.routers.deps import get_current_user
 
@@ -11,8 +12,8 @@ router = APIRouter(prefix="/reports", tags=["reports"])
 
 
 @router.get("/pdf")
-def get_pdf_report(db: Session = Depends(get_db), _: str = Depends(get_current_user)):
-    pdf_bytes = generate_pdf_report(db)
+def get_pdf_report(sb: Client = Depends(get_supabase), _: str = Depends(get_current_user)):
+    pdf_bytes = generate_pdf_report(sb)
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",
@@ -21,34 +22,37 @@ def get_pdf_report(db: Session = Depends(get_db), _: str = Depends(get_current_u
 
 
 @router.get("/dashboard-data")
-def get_dashboard_data(db: Session = Depends(get_db), _: str = Depends(get_current_user)):
-    from app.models.protocol import Protocol, QueryHistory
-    from datetime import date
-    from sqlalchemy import func
+def get_dashboard_data(sb: Client = Depends(get_supabase), _: str = Depends(get_current_user)):
+    protocols = sb.table("protocols").select("*, query_history(*)").execute().data
 
-    protocols = db.query(Protocol).all()
     total = len(protocols)
-    ativos = sum(1 for p in protocols if p.ativo)
+    ativos = sum(1 for p in protocols if p.get("ativo"))
     com_mudanca = sum(
         1 for p in protocols
-        if p.historico and p.historico[-1].houve_mudanca
+        if p.get("query_history") and p["query_history"][-1].get("houve_mudanca")
     )
-    por_projeto = {}
+
+    por_projeto: dict = {}
     for p in protocols:
-        por_projeto.setdefault(p.projeto, []).append({
-            "id": p.id,
-            "protocolo": p.protocolo,
-            "status": p.status,
-            "situacao": p.situacao,
-            "ativo": p.ativo,
-            "ultima_consulta": p.ultima_consulta.isoformat() if p.ultima_consulta else None,
-            "houve_mudanca": bool(p.historico and p.historico[-1].houve_mudanca),
-            "duracao_dias": ((p.data_finalizacao or date.today()) - p.data_abertura).days if p.data_abertura else None,
+        abertura = p.get("data_abertura")
+        fim = p.get("data_finalizacao")
+        if abertura:
+            d_abertura = date.fromisoformat(abertura)
+            d_fim = date.fromisoformat(fim) if fim else date.today()
+            duracao = (d_fim - d_abertura).days
+        else:
+            duracao = None
+
+        historico = p.get("query_history") or []
+        por_projeto.setdefault(p["projeto"], []).append({
+            "id": p["id"],
+            "protocolo": p["protocolo"],
+            "status": p["status"],
+            "situacao": p.get("situacao"),
+            "ativo": p.get("ativo"),
+            "ultima_consulta": p.get("ultima_consulta"),
+            "houve_mudanca": bool(historico and historico[-1].get("houve_mudanca")),
+            "duracao_dias": duracao,
         })
 
-    return {
-        "total": total,
-        "ativos": ativos,
-        "com_mudanca_recente": com_mudanca,
-        "por_projeto": por_projeto,
-    }
+    return {"total": total, "ativos": ativos, "com_mudanca_recente": com_mudanca, "por_projeto": por_projeto}
