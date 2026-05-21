@@ -42,6 +42,15 @@ export const importSpreadsheet = (file) => {
   return api.post('/import/spreadsheet', fd).then((r) => r.data)
 }
 
+export const previewSpreadsheet = (file) => {
+  const fd = new FormData()
+  fd.append('file', file)
+  return api.post('/import/preview', fd).then((r) => r.data)
+}
+
+export const confirmImport = (rows) =>
+  api.post('/import/confirm', { rows }).then((r) => r.data)
+
 // Scraping
 export const runAllQueries = () => api.post('/scraping/run-all').then((r) => r.data)
 export const runSingleQuery = (id) => api.post(`/scraping/run/${id}`).then((r) => r.data)
