@@ -138,7 +138,8 @@ def _revalidar_payload(reg: dict):
 
     for campo in _CAMPOS_TEXTO:
         val = str(reg.get(campo, "") or "").strip()
-        payload[campo] = val or None
+        # orgao_site_consultado é NOT NULL no banco; demais campos aceitam NULL
+        payload[campo] = val if campo == "orgao_site_consultado" else (val or None)
 
     for campo in _CAMPOS_DATA:
         payload[campo] = _formata_data(reg.get(campo))
@@ -257,6 +258,17 @@ def _processar_aba_base(ws, nome_aba):
     return registros, ignorados, erros
 
 
+def _cel(row, col, default=""):
+    """Lê célula do pandas evitando que NaN vire a string 'nan'."""
+    v = row.get(col, default)
+    try:
+        if pd.isna(v):
+            return default
+    except (TypeError, ValueError):
+        pass
+    return v
+
+
 def _processar_carga_inicial(file_buffer):
     """Parse a aba 'Carga Inicial' (formato de saída com colunas já separadas)."""
     registros, ignorados, erros = [], [], []
@@ -271,11 +283,11 @@ def _processar_carga_inicial(file_buffer):
     for i, row in df.iterrows():
         linha = f"Carga Inicial:{i + 5}"
         try:
-            status = _normaliza_status(row.get("status", ""))
-            projeto = _normaliza_projeto(str(row.get("projeto", "")).strip())
-            protocolo = str(row.get("protocolo", "")).strip()
-            atividade = str(row.get("atividade", "")).strip()
-            orgao = str(row.get("orgao_site_consultado", "")).strip()
+            status = _normaliza_status(_cel(row, "status"))
+            projeto = _normaliza_projeto(str(_cel(row, "projeto")).strip())
+            protocolo = str(_cel(row, "protocolo")).strip()
+            atividade = str(_cel(row, "atividade")).strip()
+            orgao = str(_cel(row, "orgao_site_consultado")).strip()
 
             if not all([status, projeto, protocolo, atividade, orgao]):
                 ignorados.append({"linha": linha, "motivo": "Campos obrigatórios ausentes"})
@@ -287,7 +299,7 @@ def _processar_carga_inicial(file_buffer):
                 continue
 
             data_finalizacao = _formata_data(row.get("data_finalizacao"))
-            ativo_raw = str(row.get("ativo", "Sim")).strip().lower()
+            ativo_raw = str(_cel(row, "ativo", "Sim")).strip().lower()
 
             registros.append({
                 "linha": linha,
@@ -296,13 +308,13 @@ def _processar_carga_inicial(file_buffer):
                 "protocolo": protocolo,
                 "atividade": atividade,
                 "orgao_site_consultado": orgao,
-                "atribuido_a": str(row.get("atribuido_a", "")).strip() or None,
+                "atribuido_a": str(_cel(row, "atribuido_a")).strip() or None,
                 "data_abertura": data_abertura,
                 "data_finalizacao": data_finalizacao,
-                "situacao": str(row.get("situacao", "")).strip() or None,
+                "situacao": str(_cel(row, "situacao")).strip() or None,
                 "ativo": ativo_raw in ("sim", "yes", "true", "1"),
-                "url_consulta": str(row.get("url_consulta", "")).strip() or None,
-                "observacao_consulta": str(row.get("observacao_consulta", "")).strip() or None,
+                "url_consulta": str(_cel(row, "url_consulta")).strip() or None,
+                "observacao_consulta": str(_cel(row, "observacao_consulta")).strip() or None,
             })
         except Exception as e:
             erros.append({"linha": linha, "erro": str(e)})

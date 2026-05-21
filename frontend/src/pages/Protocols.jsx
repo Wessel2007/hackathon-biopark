@@ -77,7 +77,7 @@ export default function Protocols() {
   const saveMut = useMutation({
     mutationFn: (d) => editItem ? updateProtocol(editItem.id, d) : createProtocol(d),
     onSuccess: () => {
-      qc.invalidateQueries(['protocols'])
+      qc.invalidateQueries({ queryKey: ['protocols'] })
       setShowForm(false); setEditItem(null); setForm(EMPTY_FORM); setFormError(null)
     },
     onError: (err) => {
@@ -88,7 +88,7 @@ export default function Protocols() {
 
   const delMut = useMutation({
     mutationFn: (id) => deleteProtocol(id),
-    onSuccess: () => { qc.invalidateQueries(['protocols']); setPageError(null) },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['protocols'] }); setPageError(null) },
     onError: (err) => {
       const msg = err.response?.data?.detail || err.message || 'Erro ao excluir protocolo'
       setPageError(typeof msg === 'object' ? JSON.stringify(msg) : msg)
@@ -120,12 +120,12 @@ export default function Protocols() {
 
   const queryMut = useMutation({
     mutationFn: (id) => runSingleQuery(id),
-    onSuccess: (res) => { qc.invalidateQueries(['protocols']); setQueryResult(res) },
+    onSuccess: (res) => { qc.invalidateQueries({ queryKey: ['protocols'] }); setQueryResult(res) },
   })
 
   const bulkDelMut = useMutation({
     mutationFn: (force) => bulkDeleteProtocols([...selected], force),
-    onSuccess: () => { qc.invalidateQueries(['protocols']); setSelected(new Set()); setShowBulkConfirm(false) },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['protocols'] }); setSelected(new Set()); setShowBulkConfirm(false) },
     onError: (err) => {
       const msg = err.response?.data?.detail || err.message || 'Erro ao excluir'
       setPageError(typeof msg === 'object' ? JSON.stringify(msg) : msg)
@@ -172,7 +172,7 @@ export default function Protocols() {
       const result = await confirmImport(importPreview.rows)
       setImportResult(result)
       setImportPreview(null)
-      qc.invalidateQueries(['protocols'])
+      qc.invalidateQueries({ queryKey: ['protocols'] })
     } catch (err) {
       setPageError(err.response?.data?.detail || 'Erro ao importar dados')
     } finally {
@@ -466,13 +466,23 @@ export default function Protocols() {
         {/* Modal: Resultado importação */}
         {importResult && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-            <div className="bg-white rounded-2xl shadow-2xl p-6 w-80">
+            <div className="bg-white rounded-2xl shadow-2xl p-6 w-96">
               <h3 className="text-base font-semibold text-gray-900 mb-4">Importação concluída</h3>
               <div className="space-y-2">
                 <ResultRow color="emerald" label="Importados" value={importResult.importados?.length ?? 0} />
                 <ResultRow color="amber"   label="Ignorados"  value={importResult.ignorados?.length ?? 0} />
                 <ResultRow color="red"     label="Erros"      value={importResult.erros?.length ?? 0} />
               </div>
+              {importResult.erros?.length > 0 && (
+                <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 space-y-1 max-h-32 overflow-y-auto">
+                  {importResult.erros.map((e, i) => (
+                    <p key={i}><span className="font-medium">{e.linha}:</span> {e.erro}</p>
+                  ))}
+                </div>
+              )}
+              {importResult.ignorados?.length > 0 && importResult.importados?.length === 0 && (
+                <p className="mt-2 text-xs text-amber-700">Linhas ignoradas podem ser duplicatas já existentes no banco.</p>
+              )}
               <button onClick={() => setImportResult(null)} className="mt-4 w-full py-2 bg-brand-700 hover:bg-brand-800 text-white rounded-lg text-sm font-medium transition">OK</button>
             </div>
           </div>

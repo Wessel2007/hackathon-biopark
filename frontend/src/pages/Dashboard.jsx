@@ -209,7 +209,7 @@ export default function Dashboard() {
     try {
       const result = await confirmImport(importPreview.rows)
       setImportResult(result); setImportPreview(null)
-      qc.invalidateQueries(['protocols']); qc.invalidateQueries(['dashboard'])
+      qc.invalidateQueries({ queryKey: ['protocols'] }); qc.invalidateQueries({ queryKey: ['dashboard'] })
     } catch (err) { setPageError(err.response?.data?.detail || 'Erro ao importar dados') }
     finally { setConfirming(false) }
   }
@@ -629,6 +629,16 @@ export default function Dashboard() {
             <ResultRow tone="amber" label="Ignorados"  value={importResult.ignorados?.length ?? 0} />
             <ResultRow tone="red"   label="Erros"      value={importResult.erros?.length ?? 0} />
           </div>
+          {importResult.erros?.length > 0 && (
+            <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 space-y-1 max-h-32 overflow-y-auto">
+              {importResult.erros.map((e, i) => (
+                <p key={i}><span className="font-medium">{e.linha}:</span> {e.erro}</p>
+              ))}
+            </div>
+          )}
+          {importResult.ignorados?.length > 0 && importResult.importados?.length === 0 && (
+            <p className="mt-2 text-xs text-amber-700">Linhas ignoradas podem ser duplicatas já existentes no banco.</p>
+          )}
           <button onClick={() => setImportResult(null)} className="mt-5 w-full py-2.5 bg-ink text-lime hover:bg-ink-2 rounded-lg text-sm font-semibold transition">Ok</button>
         </Modal>
       )}
