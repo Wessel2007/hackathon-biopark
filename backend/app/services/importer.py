@@ -10,6 +10,7 @@ SKIP_SHEETS = {"Configuração"}
 STATUS_MAP = {
     "CANC": "CANCELADO",
     "ANÁL": "EM ANDAMENTO",
+    "APRO": "APROVADO",
 }
 
 # Separadores aceitos entre Projeto e Protocolo, em ordem de prioridade.

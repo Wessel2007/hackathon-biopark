@@ -56,7 +56,7 @@ export const runAllQueries = () => api.post('/scraping/run-all').then((r) => r.d
 export const runSingleQuery = (id) => api.post(`/scraping/run/${id}`).then((r) => r.data)
 
 // Reports
-export const getDashboardData = () => api.get('/reports/dashboard-data').then((r) => r.data)
+export const getDashboardData = (params) => api.get('/reports/dashboard-data', { params }).then((r) => r.data)
 export const downloadPdf = () =>
   api.get('/reports/pdf', { responseType: 'blob' }).then((r) => {
     const url = URL.createObjectURL(r.data)

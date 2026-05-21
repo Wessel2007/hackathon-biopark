@@ -5,7 +5,13 @@
       "Bash(Select-Object -Property Name, PSIsContainer)",
       "Bash(Format-Table -AutoSize)",
       "Bash(npx vite *)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(npx playwright *)",
+      "Bash(node -e ' *)",
+      "Bash(cat)",
+      "Bash(npm root *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\heyxi\\\\Downloads\\\\hackathon-biopark\" -Recurse -Directory)",
+      "Bash(Select-Object FullName)"
     ]
   }
 }

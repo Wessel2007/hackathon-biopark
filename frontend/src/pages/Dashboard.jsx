@@ -15,7 +15,6 @@ import {
 const STATUS_CONFIG = [
   { key: 'EM ANDAMENTO', label: 'ANDAMENTO', badge: 'bg-blue-50 text-blue-700 border-blue-200',         badgeActive: 'bg-blue-100 text-blue-800 border-blue-300',         activeBg: 'bg-blue-50',    activeBorder: 'border-blue-200',    activeValue: 'text-blue-800'    },
   { key: 'PENDENTE',     label: 'PENDENTE',   badge: 'bg-amber-50 text-amber-700 border-amber-200',     badgeActive: 'bg-amber-100 text-amber-800 border-amber-300',     activeBg: 'bg-amber-50',   activeBorder: 'border-amber-200',   activeValue: 'text-amber-800'   },
-  { key: 'APRO',        label: 'APRO',       badge: 'bg-emerald-50 text-emerald-700 border-emerald-200', badgeActive: 'bg-emerald-100 text-emerald-800 border-emerald-300', activeBg: 'bg-emerald-50', activeBorder: 'border-emerald-200', activeValue: 'text-emerald-800' },
   { key: 'APROVADO',    label: 'APROVADO',   badge: 'bg-emerald-50 text-emerald-700 border-emerald-200', badgeActive: 'bg-emerald-100 text-emerald-800 border-emerald-300', activeBg: 'bg-emerald-50', activeBorder: 'border-emerald-200', activeValue: 'text-emerald-800' },
   { key: 'CANCELADO',   label: 'CANCELADO',  badge: 'bg-red-50 text-red-700 border-red-200',            badgeActive: 'bg-red-100 text-red-800 border-red-300',            activeBg: 'bg-red-50',     activeBorder: 'border-red-200',     activeValue: 'text-red-800'     },
   { key: 'REPROVADO',   label: 'REPROVADO',  badge: 'bg-red-50 text-red-700 border-red-200',            badgeActive: 'bg-red-100 text-red-800 border-red-300',            activeBg: 'bg-red-50',     activeBorder: 'border-red-200',     activeValue: 'text-red-800'     },
@@ -678,7 +677,6 @@ function StatCard({ label, value, icon: Icon, color }) {
 
 function StatusBadge({ status }) {
   const map = {
-    APRO:           'bg-emerald-50 text-emerald-700 border-emerald-200',
     APROVADO:       'bg-emerald-50 text-emerald-700 border-emerald-200',
     'EM ANDAMENTO': 'bg-blue-50 text-blue-700 border-blue-200',
     PENDENTE:       'bg-amber-50 text-amber-700 border-amber-200',
