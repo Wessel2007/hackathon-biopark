@@ -31,6 +31,16 @@ hackathon-biopark/
     └── initial_load/           # Coloque as planilhas aqui
 ```
 
+## Rodar local (front + back)
+
+Na raiz do repositório:
+
+```bash
+npm run dev
+```
+
+Instala dependências (Node + Python em `backend/.venv`) e sobe API e frontend juntos.
+
 ## Setup — Backend
 
 ```bash

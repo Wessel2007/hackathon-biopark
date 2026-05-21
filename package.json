@@ -1,0 +1,14 @@
+{
+  "name": "hackathon-biopark",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "setup": "node scripts/setup.js",
+    "dev": "node scripts/setup.js && concurrently -k -n api,web -c blue,green \"node scripts/run-backend.js\" \"npm run dev --prefix frontend\"",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "dev:backend": "node scripts/run-backend.js"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

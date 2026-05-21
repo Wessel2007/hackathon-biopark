@@ -7,6 +7,21 @@
 
 ---
 
+## Tudo de uma vez (recomendado)
+
+Na raiz do repositório:
+
+```bash
+npm run dev
+```
+
+Esse comando:
+1. Instala dependências do Node (raiz + frontend) e do Python (`backend/.venv` + `requirements.txt`)
+2. Cria `.env` a partir dos exemplos, se ainda não existirem
+3. Sobe o backend (http://localhost:8000) e o frontend (http://localhost:5173) no mesmo terminal
+
+---
+
 ## Backend
 
 ```bash
