@@ -5,12 +5,13 @@ import Reports from './pages/Reports'
 import ReportsLogin from './pages/ReportsLogin'
 import { getCargoFromToken } from './services/api'
 
+function PrivateRoute({ children }) {
+  return localStorage.getItem('token') ? children : <Navigate to="/login" replace />
+}
+
 function AdminRoute({ children }) {
   if (!localStorage.getItem('token')) return <Navigate to="/login" replace />
-  if (getCargoFromToken() !== 'admin') {
-    localStorage.removeItem('token')
-    return <Navigate to="/login" replace />
-  }
+  if (getCargoFromToken() !== 'admin') return <Navigate to="/" replace />
   return children
 }
 
@@ -25,7 +26,7 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/reports-login" element={<AdminRoute><ReportsLogin /></AdminRoute>} />
-      <Route path="/" element={<AdminRoute><Dashboard /></AdminRoute>} />
+      <Route path="/" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
       <Route path="/reports" element={<PrivateReportsRoute><Reports /></PrivateReportsRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
