@@ -44,5 +44,8 @@ Thumbs.db
 ~$*
 *.tmp
 
+# Claude Code
+.claude/
+
 # Relatórios gerados
 *.pdf

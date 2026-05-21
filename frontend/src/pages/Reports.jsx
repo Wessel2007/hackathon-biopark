@@ -9,7 +9,7 @@ import {
 import {
   ArrowLeft, Download, CheckCircle2, ChevronDown, X,
 } from 'lucide-react'
-import { getDashboardData, downloadPdf } from '../services/api'
+import { getDashboardData, downloadPdf, getProtocols } from '../services/api'
 
 const STATUS_COLORS = {
   'EM ANDAMENTO': '#3454ff',
@@ -55,8 +55,30 @@ export default function Reports() {
     queryFn: () => getDashboardData(params),
   })
 
+  const { data: allProtocols = [] } = useQuery({
+    queryKey: ['protocols-all'],
+    queryFn: () => getProtocols({ limit: 10000 }),
+  })
+
+  const orgaoOptions = useMemo(() =>
+    [...new Set(allProtocols.map(p => p.orgao_site_consultado).filter(Boolean))].sort(),
+  [allProtocols])
+
+  const projetoOptions = useMemo(() =>
+    [...new Set(allProtocols.map(p => p.projeto).filter(Boolean))].sort(),
+  [allProtocols])
+
   const kpis = data?.kpis ?? {}
   const totalConsultas = (data?.consultas_por_periodo ?? []).reduce((a, b) => a + (b.count ?? 0), 0)
+
+  const taxaAprovacao = useMemo(() => {
+    const porStatus = data?.por_status ?? []
+    const get = (s) => porStatus.find(x => x.status === s)?.count ?? 0
+    const aprovados  = get('APROVADO') + get('REGISTRADO')
+    const encerrados = aprovados + get('REPROVADO') + get('CANCELADO')
+    if (encerrados === 0) return null
+    return Math.round((aprovados / encerrados) * 100)
+  }, [data])
 
   function set(key) {
     return v => setFilters(f => ({ ...f, [key]: v }))
@@ -137,17 +159,17 @@ export default function Reports() {
               placeholder="Ativo e inativo"
               options={[['true', 'Apenas ativos'], ['false', 'Apenas inativos']]}
             />
-            <TextFilter
+            <FilterChip
               value={filters.projeto}
               onChange={set('projeto')}
-              placeholder="Projeto…"
-              width="w-40"
+              placeholder="Todos os projetos"
+              options={projetoOptions.map(p => [p, p])}
             />
-            <TextFilter
+            <FilterChip
               value={filters.orgao}
               onChange={set('orgao')}
-              placeholder="Órgão…"
-              width="w-44"
+              placeholder="Todos os órgãos"
+              options={orgaoOptions.map(o => [o, o])}
             />
           </div>
 
@@ -216,7 +238,7 @@ export default function Reports() {
               <Kpi label="Ativos"              value={kpis.ativos ?? 0}               tone="green" delta={`${Math.round(((kpis.ativos ?? 0) / Math.max(kpis.total ?? 1, 1)) * 100)}%`} />
               <Kpi label="Mudanças recentes"   value={kpis.com_mudanca_recente ?? 0}  tone="lime"  delta="hoje" />
               <Kpi label="Erros de consulta"   value={kpis.erros_consulta ?? 0}       tone={kpis.erros_consulta > 0 ? 'red' : 'green'} />
-              <Kpi label="Duração média (d)"   value={kpis.duracao_media ?? 0}        tone="neutral" />
+              <Kpi label="Taxa de aprovação"    value={taxaAprovacao != null ? `${taxaAprovacao}%` : '—'} tone={taxaAprovacao >= 70 ? 'green' : taxaAprovacao >= 40 ? 'amber' : 'red'} />
               <Kpi label="Maior órgão"         value={kpis.orgao_top ?? '—'}          tone="neutral" small />
             </div>
 
