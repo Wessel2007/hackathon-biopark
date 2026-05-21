@@ -3,11 +3,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   getProtocols, createProtocol, updateProtocol, deleteProtocol,
   bulkDeleteProtocols, runSingleQuery, importSpreadsheet,
-  previewSpreadsheet, confirmImport,
+  previewSpreadsheet, confirmImport, getEvidenceUrl,
 } from '../services/api'
 import {
   Plus, Upload, RefreshCw, Pencil, Trash2, ArrowLeft,
   Search, Building2, X, ChevronDown, AlertTriangle, ClipboardList,
+  Camera,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
@@ -563,7 +564,19 @@ export default function Protocols() {
                 </p>
               )}
 
-              <button onClick={() => setQueryResult(null)} className="mt-4 w-full py-2 bg-brand-700 hover:bg-brand-800 text-white rounded-lg text-sm font-medium transition">OK</button>
+              {queryResult.tem_evidencia && queryResult.history_id && (
+                <a
+                  href={getEvidenceUrl(queryResult.history_id)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-4 w-full flex items-center justify-center gap-2 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition"
+                >
+                  <Camera size={14} />
+                  Ver Evidência (Screenshot do Site)
+                </a>
+              )}
+
+              <button onClick={() => setQueryResult(null)} className="mt-2 w-full py-2 bg-brand-700 hover:bg-brand-800 text-white rounded-lg text-sm font-medium transition">OK</button>
             </div>
           </div>
         )}

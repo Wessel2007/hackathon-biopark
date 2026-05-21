@@ -2,6 +2,7 @@ from datetime import datetime, timezone, timedelta
 import random
 import re
 import json
+import base64
 import unicodedata
 
 from app.supabase_client import SupabaseClient
@@ -9,7 +10,7 @@ from app.services.email_service import enviar_alerta
 
 
 # ---------------------------------------------------------------------------
-# Mock simulation (hackathon mode — no real HTTP requests)
+# Mock simulation (fallback para órgãos sem scraper real)
 # ---------------------------------------------------------------------------
 
 _ORGAN_STATUSES: dict[str, list[str]] = {
@@ -59,6 +60,7 @@ def _mock_query(p: dict) -> dict:
             "situacao_consultada": None,
             "observacao":         None,
             "texto_bruto":        None,
+            "screenshot_base64":  None,
             "data_movimentacao":  None,
             "fonte_consulta":     f"SIMULADO: {orgao}" if orgao else "SIMULADO",
             "erro": "Protocolo ou órgão não informado — consulta não realizada.",
@@ -76,6 +78,7 @@ def _mock_query(p: dict) -> dict:
                 "situacao_consultada": "NAO_ENCONTRADO",
                 "observacao":  f"Protocolo {protocolo} não localizado no sistema de {orgao}.",
                 "texto_bruto": None,
+                "screenshot_base64": None,
                 "data_movimentacao": data_mov,
                 "fonte_consulta": f"SIMULADO: {orgao}",
                 "erro": None,
@@ -91,19 +94,301 @@ def _mock_query(p: dict) -> dict:
         "situacao_consultada": None,
         "observacao":          obs,
         "texto_bruto":         None,
+        "screenshot_base64":   None,
         "data_movimentacao":   data_mov,
         "fonte_consulta":      f"SIMULADO: {orgao}",
         "erro":                None,
     }
 
 
+# ---------------------------------------------------------------------------
+# Scraper real — Cartório PR (Toledo)
+# ---------------------------------------------------------------------------
+
+_CARTORIOS_PR_URL = "https://www.cartoriospr.com.br/eandamento/index.php?token="
+
+
 def _is_cartorios_pr_query(p: dict) -> bool:
+    """Retorna True apenas para protocolos do Cartório Imóveis (cartoriospr.com.br)."""
     orgao = _normalize(p.get("orgao_site_consultado") or "")
-    return "cartorio" in orgao
+    url   = (p.get("url_consulta") or "").lower()
+    # Aceita variações: "Cartório Imóveis", "Cartório de Imóveis", "1° Ofício de Imóveis", etc.
+    # _normalize remove acentos: "imóveis" → "imoveis", "imóvel" → "imovel"
+    return (
+        "imoveis" in orgao
+        or "imovel" in orgao
+        or "cartoriospr" in url
+        or "eandamento" in url
+    )
+
+
+# Mapeamento dos status do cartório para os status internos do sistema
+_CARTORIO_STATUS_MAP: dict[str, str] = {
+    "REGISTRADO":   "APROVADO",
+    "APROVADO":     "APROVADO",
+    "EM ANÁLISE":   "EM ANDAMENTO",
+    "EM ANDAMENTO": "EM ANDAMENTO",
+    "PRENOTADO":    "EM ANDAMENTO",
+    "EXAMINADO":    "EM ANDAMENTO",
+    "QUALIFICADO":  "EM ANDAMENTO",
+    "AGUARDANDO":   "PENDENTE",
+    "DEVOLVIDO":    "PENDENTE",
+    "PENDENTE":     "PENDENTE",
+    "CANCELADO":    "CANCELADO",
+}
+
+
+def _mapear_status_sistema(status_cartorio: str | None) -> str | None:
+    """Converte o status retornado pelo site do cartório para o status interno."""
+    if not status_cartorio:
+        return None
+    upper = status_cartorio.strip().upper()
+    norm  = _normalize(upper)
+    # Busca exata (com acento) primeiro
+    if upper in _CARTORIO_STATUS_MAP:
+        return _CARTORIO_STATUS_MAP[upper]
+    # Busca normalizada (sem acento) e parcial
+    norm_map = {_normalize(k): v for k, v in _CARTORIO_STATUS_MAP.items()}
+    if norm in norm_map:
+        return norm_map[norm]
+    for key_norm, val in norm_map.items():
+        if key_norm in norm:
+            return val
+    return upper  # mantém o original se não mapeado
+
+
+def _parse_cartorio_result(html: str, protocolo: str) -> tuple:
+    """Retorna (status, observacao, data_movimentacao) extraídos do HTML de resultado."""
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(html, "html.parser")
+    body_text = soup.get_text(" ", strip=True)
+
+    # Verificar protocolo não encontrado (inclui mensagem específica do site)
+    if re.search(
+        r"número digitado não foi encontrado|não\s+encontrado|não\s+localizado"
+        r"|nenhum\s+resultado|sem\s+resultado|protocolo.*não.*exist",
+        body_text, re.I
+    ):
+        return None, f"Protocolo {protocolo} não localizado no cartório.", None
+
+    status = None
+    obs_parts = []
+    data_mov = None
+
+    _STATUS_KEYWORDS = [
+        "REGISTRADO", "EM ANÁLISE", "EM ANDAMENTO", "EXAMINADO",
+        "CANCELADO", "AGUARDANDO", "APROVADO", "PENDENTE", "DEVOLVIDO",
+        "QUALIFICADO", "PRENOTADO",
+    ]
+
+    # Buscar em tabelas
+    for table in soup.find_all("table"):
+        for row in table.find_all("tr"):
+            cells = [td.get_text(" ", strip=True) for td in row.find_all(["td", "th"])]
+            for i, cell in enumerate(cells):
+                cell_up = cell.upper()
+                for kw in _STATUS_KEYWORDS:
+                    if kw in cell_up:
+                        status = kw
+                        # células adjacentes como observação
+                        adj = [c for j, c in enumerate(cells) if j != i and c]
+                        if adj:
+                            obs_parts.append(" | ".join(adj))
+                        break
+                date_m = re.search(r"\d{2}/\d{2}/\d{4}", cell)
+                if date_m and not data_mov:
+                    data_mov = date_m.group()
+
+    # Fallback: buscar no texto completo
+    if not status:
+        for kw in _STATUS_KEYWORDS:
+            if kw in body_text.upper():
+                status = kw
+                break
+
+    if not data_mov:
+        date_m = re.search(r"\d{2}/\d{2}/\d{4}", body_text)
+        if date_m:
+            data_mov = date_m.group()
+
+    obs = " | ".join(obs_parts) if obs_parts else (
+        f"Protocolo {protocolo}: {status}." if status else
+        f"Protocolo {protocolo} consultado. Verifique o screenshot para detalhes."
+    )
+
+    return status, obs, data_mov
 
 
 def _query_cartorios_pr_toledo(p: dict) -> dict:
-    return _mock_query(p)
+    protocolo  = (p.get("protocolo") or "").strip()
+    orgao      = (p.get("orgao_site_consultado") or "").strip()
+    url_salva  = (p.get("url_consulta") or "").strip()
+
+    if not protocolo:
+        return {
+            "status_consultado":  None,
+            "situacao_consultada": None,
+            "observacao":         None,
+            "texto_bruto":        None,
+            "screenshot_base64":  None,
+            "data_movimentacao":  None,
+            "fonte_consulta":     _CARTORIOS_PR_URL,
+            "erro": "Número do protocolo não informado — consulta não realizada.",
+        }
+
+    # 1° ou 2° Ofício
+    oficios = "2" if "2" in orgao else "1"
+    serventia_label = f"Toledo - {oficios}º Ofício"
+
+    try:
+        from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
+    except ImportError:
+        return _mock_query(p)
+
+    try:
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch(
+                headless=True,
+                args=[
+                    "--no-sandbox",
+                    "--disable-setuid-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-gpu",
+                ],
+            )
+            ctx = browser.new_context(
+                viewport={"width": 1280, "height": 900},
+                user_agent=(
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/120.0.0.0 Safari/537.36"
+                ),
+            )
+            page = ctx.new_page()
+
+            # ── Navegação ──────────────────────────────────────────────────
+            # Se já temos URL com token direto, usamos ela; senão montamos
+            if url_salva and "cartoriospr" in url_salva:
+                nav_url = url_salva
+            else:
+                nav_url = f"{_CARTORIOS_PR_URL}{protocolo}"
+
+            page.goto(nav_url, wait_until="domcontentloaded", timeout=30000)
+            try:
+                page.wait_for_load_state("networkidle", timeout=10000)
+            except PWTimeout:
+                pass
+
+            # Verificar se caiu na tela do formulário (token vazio ou inválido)
+            # Se tiver select (formulário), preencher manualmente
+            selects = page.locator("select")
+            if selects.count() > 0:
+                # ── 1. Serventia ──────────────────────────────────────────
+                try:
+                    selects.first.select_option(label=serventia_label)
+                except Exception:
+                    try:
+                        selects.first.select_option(
+                            label=re.compile(rf"Toledo.*{oficios}", re.I)
+                        )
+                    except Exception:
+                        pass
+
+                # ── 2. Tipo: Protocolo de Registro/Averbações (2° radio) ──
+                radios = page.locator("input[type='radio']")
+                if radios.count() > 1:
+                    try:
+                        radios.nth(1).check(force=True)
+                    except Exception:
+                        pass
+
+                # ── 3. Número do protocolo ────────────────────────────────
+                filled = False
+                for sel in ["input[type='number']", "input[type='text']"]:
+                    inputs = page.locator(sel)
+                    if inputs.count() > 0:
+                        try:
+                            inputs.first.fill(protocolo)
+                            filled = True
+                            break
+                        except Exception:
+                            pass
+
+                # ── 4. Checkbox de termos ─────────────────────────────────
+                checkboxes = page.locator("input[type='checkbox']")
+                for i in range(checkboxes.count()):
+                    try:
+                        if not checkboxes.nth(i).is_checked():
+                            checkboxes.nth(i).check(force=True)
+                    except Exception:
+                        pass
+
+                # ── 5. Clicar em Consultar ────────────────────────────────
+                clicked = False
+                for btn_sel in [
+                    "button:has-text('Consultar')",
+                    "input[type='submit']",
+                    "button[type='submit']",
+                    "button",
+                ]:
+                    btns = page.locator(btn_sel)
+                    if btns.count() > 0:
+                        try:
+                            btns.last.click()
+                            clicked = True
+                            break
+                        except Exception:
+                            continue
+                if not clicked:
+                    try:
+                        page.locator("form").first.evaluate("f => f.submit()")
+                    except Exception:
+                        pass
+
+                # ── Aguardar resultado após submit ────────────────────────
+                try:
+                    page.wait_for_load_state("networkidle", timeout=15000)
+                except PWTimeout:
+                    pass
+                page.wait_for_timeout(1500)
+
+            else:
+                # Já está na página de resultado (URL com token direto)
+                page.wait_for_timeout(1000)
+
+            # ── 7. Screenshot do resultado (evidência) ────────────────────
+            screenshot_bytes = page.screenshot(full_page=True)
+            screenshot_b64   = base64.b64encode(screenshot_bytes).decode()
+
+            # ── 8. Parsear resultado ──────────────────────────────────────
+            html   = page.content()
+            status, obs, data_mov = _parse_cartorio_result(html, protocolo)
+
+            browser.close()
+
+        return {
+            "status_consultado":  status,
+            "situacao_consultada": None,
+            "observacao":         obs,
+            "texto_bruto":        html[:8000] if html else None,
+            "screenshot_base64":  screenshot_b64,
+            "data_movimentacao":  data_mov,
+            "fonte_consulta":     f"CARTÓRIO PR — {serventia_label}",
+            "erro":               None,
+        }
+
+    except Exception as exc:
+        return {
+            "status_consultado":  None,
+            "situacao_consultada": None,
+            "observacao":         None,
+            "texto_bruto":        None,
+            "screenshot_base64":  None,
+            "data_movimentacao":  None,
+            "fonte_consulta":     _CARTORIOS_PR_URL,
+            "erro":               f"Erro na consulta ao cartório: {str(exc)[:300]}",
+        }
 
 
 def _query_source(p: dict) -> dict:
@@ -113,7 +398,7 @@ def _query_source(p: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Change detection
+# Detecção de mudanças
 # ---------------------------------------------------------------------------
 
 def _build_mudancas(ultimo: dict | None, resultado: dict, protocolo_num: str) -> list[str]:
@@ -163,7 +448,7 @@ def _build_mudancas(ultimo: dict | None, resultado: dict, protocolo_num: str) ->
 
 
 # ---------------------------------------------------------------------------
-# Main entry points
+# Entry points
 # ---------------------------------------------------------------------------
 
 def run_single_query(protocol_id: int, sb: SupabaseClient, user_email: str = "") -> dict:
@@ -198,12 +483,12 @@ def run_single_query(protocol_id: int, sb: SupabaseClient, user_email: str = "")
 
     now = datetime.now(timezone.utc).isoformat()
 
-    sb.table("query_history").insert({
+    insert_result = sb.table("query_history").insert({
         "protocol_id":        protocol_id,
         "status_consultado":  resultado["status_consultado"],
         "situacao_consultada": resultado.get("situacao_consultada"),
         "observacao":         resultado["observacao"],
-        "texto_bruto":        resultado["texto_bruto"],
+        "texto_bruto":        resultado.get("texto_bruto"),
         "houve_mudanca":      houve_mudanca,
         "erro":               resultado["erro"],
         "data_consulta":      now,
@@ -211,20 +496,33 @@ def run_single_query(protocol_id: int, sb: SupabaseClient, user_email: str = "")
         "mudancas_detectadas": json.dumps(mudancas, ensure_ascii=False) if mudancas else None,
         "fonte_consulta":     resultado.get("fonte_consulta"),
         "status_anterior":    status_anterior,
+        "screenshot_base64":  resultado.get("screenshot_base64"),
     }).execute()
 
+    # Recuperar o ID do registro inserido
+    history_id = None
+    if insert_result.data:
+        rows = insert_result.data if isinstance(insert_result.data, list) else [insert_result.data]
+        if rows:
+            history_id = rows[0].get("id")
+
     update_payload: dict = {
-        "ultima_consulta":    now,
+        "ultima_consulta":     now,
         "observacao_consulta": resultado["observacao"],
     }
     if resultado["status_consultado"] and not resultado["erro"]:
-        update_payload["status"] = resultado["status_consultado"]
+        # Para o Cartório Imóveis mapeia para o status interno; outros já vêm corretos
+        status_sistema = _mapear_status_sistema(resultado["status_consultado"])
+        if status_sistema:
+            update_payload["status"] = status_sistema
     sb.table("protocols").update(update_payload).eq("id", protocol_id).execute()
+
+    tem_evidencia = bool(resultado.get("screenshot_base64"))
 
     return {
         "protocolo":         p["protocolo"],
         "resultado": {
-            **resultado,
+            **{k: v for k, v in resultado.items() if k != "screenshot_base64"},
             "data_hora_consulta": now,
         },
         "houve_mudanca":      houve_mudanca,
@@ -232,6 +530,8 @@ def run_single_query(protocol_id: int, sb: SupabaseClient, user_email: str = "")
         "status_anterior":    status_anterior,
         "status_novo":        status_novo,
         "erro":               resultado.get("erro"),
+        "history_id":         history_id,
+        "tem_evidencia":      tem_evidencia,
     }
 
 
