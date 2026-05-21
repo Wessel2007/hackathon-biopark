@@ -124,6 +124,24 @@ def _is_cartorios_pr_query(p: dict) -> bool:
     )
 
 
+# Scraper real - Equiplano Toledo (CARMEL)
+def _is_equiplano_toledo_carmel_query(p: dict) -> bool:
+    """Retorna True para processos da CARMEL no Equiplano do Municipio de Toledo."""
+    url = (p.get("url_consulta") or "").lower()
+    orgao = _normalize(p.get("orgao_site_consultado") or "")
+    projeto = _normalize(p.get("projeto") or "")
+    atividade = _normalize(p.get("atividade") or "")
+
+    if "equiplano.toledo.pr.gov.br" in url or "stpprocessos" in url:
+        return True
+
+    return (
+        "carmel" in projeto
+        and ("toledo" in orgao or "toledo" in atividade)
+        and ("municipio" in orgao or "prefeitura" in orgao or "equiplano" in orgao)
+    )
+
+
 # Mapeamento dos status do cartório para os status internos do sistema
 _CARTORIO_STATUS_MAP: dict[str, str] = {
     "REGISTRADO":   "APROVADO",
@@ -376,6 +394,11 @@ def _query_cartorios_pr_toledo(p: dict) -> dict:
 def _query_source(p: dict) -> dict:
     if _is_cartorios_pr_query(p):
         return _query_cartorios_pr_toledo(p)
+    if _is_equiplano_toledo_carmel_query(p):
+        from app.services.scrapers.dispatcher import _to_internal
+        from app.services.scrapers.equiplano_toledo import query_protocol
+
+        return _to_internal(query_protocol(p))
     from app.services.scrapers.dispatcher import check_protocol_status
     return check_protocol_status(p)
 
