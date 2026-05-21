@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import AgentChat from '../components/AgentChat'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   getDashboardData, downloadPdf, runAllQueries,
@@ -200,6 +201,7 @@ export default function Dashboard() {
   function clearFilters() { setSearchQuery(''); setFilterOrgao(''); setFilterStatus(''); setFilterProject('') }
 
   return (
+    <>
     <div className="min-h-screen bg-paper text-ink">
 
       {/* ═══ NAVBAR ═══ */}
@@ -651,6 +653,9 @@ export default function Dashboard() {
         </Modal>
       )}
     </div>
+
+      <AgentChat />
+    </>
   )
 }
 
