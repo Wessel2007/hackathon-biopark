@@ -33,6 +33,7 @@ export const getProtocol = (id) => api.get(`/protocols/${id}`).then((r) => r.dat
 export const createProtocol = (data) => api.post('/protocols/', data).then((r) => r.data)
 export const updateProtocol = (id, data) => api.patch(`/protocols/${id}`, data).then((r) => r.data)
 export const deleteProtocol = (id, force = false) => api.delete(`/protocols/${id}?force=${force}`)
+export const bulkDeleteProtocols = (ids, force = false) => api.post('/protocols/bulk-delete', { ids, force }).then((r) => r.data)
 
 // Import
 export const importSpreadsheet = (file) => {

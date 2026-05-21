@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getProtocols, createProtocol, updateProtocol, deleteProtocol, runSingleQuery, importSpreadsheet } from '../services/api'
+import { getProtocols, createProtocol, updateProtocol, deleteProtocol, bulkDeleteProtocols, runSingleQuery, importSpreadsheet } from '../services/api'
 import { Plus, Upload, RefreshCw, Pencil, Trash2, ArrowLeft } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
@@ -21,6 +21,8 @@ export default function Protocols() {
   const [pageError, setPageError] = useState(null)
   const [importing, setImporting] = useState(false)
   const [importResult, setImportResult] = useState(null)
+  const [selected, setSelected] = useState(new Set())
+  const [showBulkConfirm, setShowBulkConfirm] = useState(false)
 
   const { data = [], isLoading } = useQuery({
     queryKey: ['protocols', filterProjeto],
@@ -65,6 +67,36 @@ export default function Protocols() {
     mutationFn: (id) => runSingleQuery(id),
     onSuccess: () => qc.invalidateQueries(['protocols']),
   })
+
+  const bulkDelMut = useMutation({
+    mutationFn: (force) => bulkDeleteProtocols([...selected], force),
+    onSuccess: () => {
+      qc.invalidateQueries(['protocols'])
+      setSelected(new Set())
+      setShowBulkConfirm(false)
+    },
+    onError: (err) => {
+      const msg = err.response?.data?.detail || err.message || 'Erro ao excluir'
+      setPageError(typeof msg === 'object' ? JSON.stringify(msg) : msg)
+      setShowBulkConfirm(false)
+    },
+  })
+
+  function toggleSelect(id) {
+    setSelected(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAll() {
+    if (selected.size === data.length) {
+      setSelected(new Set())
+    } else {
+      setSelected(new Set(data.map(p => p.id)))
+    }
+  }
 
   function openEdit(item) {
     setEditItem(item)
@@ -196,11 +228,49 @@ export default function Protocols() {
           </div>
         )}
 
+        {showBulkConfirm && (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl shadow-xl p-6 w-80 flex flex-col gap-4">
+              <h3 className="text-base font-semibold text-gray-800">Excluir {selected.size} protocolo(s)?</h3>
+              <p className="text-sm text-gray-500">Protocolos com histórico de consulta serão <span className="font-medium text-yellow-700">inativados</span>. Os demais serão <span className="font-medium text-red-700">removidos permanentemente</span>.</p>
+              <p className="text-xs text-gray-400">Para remover tudo permanentemente, use "Forçar exclusão".</p>
+              <div className="flex justify-end gap-2 mt-1">
+                <button onClick={() => setShowBulkConfirm(false)} className="text-sm px-3 py-2 border rounded-lg hover:bg-gray-50">Cancelar</button>
+                <button onClick={() => bulkDelMut.mutate(true)} disabled={bulkDelMut.isPending}
+                  className="text-sm px-3 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 disabled:opacity-50">
+                  Forçar exclusão
+                </button>
+                <button onClick={() => bulkDelMut.mutate(false)} disabled={bulkDelMut.isPending}
+                  className="text-sm px-3 py-2 bg-brand-700 text-white rounded-lg hover:bg-brand-900 disabled:opacity-50">
+                  {bulkDelMut.isPending ? 'Excluindo...' : 'Confirmar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {selected.size > 0 && (
+          <div className="flex items-center justify-between bg-brand-50 border border-brand-200 rounded-lg px-4 py-2">
+            <span className="text-sm text-brand-900 font-medium">{selected.size} protocolo(s) selecionado(s)</span>
+            <div className="flex gap-2">
+              <button onClick={() => setSelected(new Set())} className="text-xs text-gray-500 hover:underline">Limpar seleção</button>
+              <button onClick={() => setShowBulkConfirm(true)}
+                className="flex items-center gap-1 text-sm px-3 py-1.5 bg-red-600 text-white rounded hover:bg-red-700">
+                <Trash2 size={13} /> Excluir selecionados
+              </button>
+            </div>
+          </div>
+        )}
+
         {isLoading ? <p className="text-gray-500">Carregando...</p> : (
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             <table className="w-full text-sm">
               <thead className="text-xs text-gray-500 bg-gray-50 border-b">
                 <tr>
+                  <th className="px-3 py-2 w-8">
+                    <input type="checkbox" checked={data.length > 0 && selected.size === data.length}
+                      onChange={toggleSelectAll} />
+                  </th>
                   {['Projeto', 'Protocolo', 'Atividade', 'Órgão', 'Status', 'Situação', 'Ativo', 'Duração', 'Ações'].map(h => (
                     <th key={h} className="text-left px-3 py-2">{h}</th>
                   ))}
@@ -208,7 +278,10 @@ export default function Protocols() {
               </thead>
               <tbody>
                 {data.map((p) => (
-                  <tr key={p.id} className="border-t border-gray-50 hover:bg-gray-50">
+                  <tr key={p.id} className={`border-t border-gray-50 hover:bg-gray-50 ${selected.has(p.id) ? 'bg-brand-50' : ''}`}>
+                    <td className="px-3 py-2">
+                      <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggleSelect(p.id)} />
+                    </td>
                     <td className="px-3 py-2 font-medium">{p.projeto}</td>
                     <td className="px-3 py-2 font-mono text-xs">{p.protocolo}</td>
                     <td className="px-3 py-2 text-gray-600 max-w-32 truncate">{p.atividade}</td>

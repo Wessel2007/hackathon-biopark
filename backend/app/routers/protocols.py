@@ -1,6 +1,7 @@
 from datetime import date
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from app.supabase_client import SupabaseClient, get_supabase
 from app.schemas.protocol import ProtocolCreate, ProtocolUpdate
 from app.routers.deps import get_current_user
@@ -79,6 +80,31 @@ def update_protocol(
     if not result.data:
         raise HTTPException(status_code=500, detail="Erro ao atualizar protocolo no banco de dados")
     return _add_duracao(result.data[0])
+
+
+class BulkDeleteRequest(BaseModel):
+    ids: List[int]
+    force: bool = False
+
+
+@router.post("/bulk-delete", status_code=204)
+def bulk_delete_protocols(
+    body: BulkDeleteRequest, sb: SupabaseClient = Depends(get_supabase), _: str = Depends(get_current_user)
+):
+    if not body.ids:
+        return
+    if body.force:
+        sb.table("query_history").delete().in_("protocol_id", body.ids).execute()
+        sb.table("protocols").delete().in_("id", body.ids).execute()
+    else:
+        history = sb.table("query_history").select("protocol_id").in_("protocol_id", body.ids).execute()
+        has_history = {r["protocol_id"] for r in history.data}
+        to_inactivate = [i for i in body.ids if i in has_history]
+        to_delete = [i for i in body.ids if i not in has_history]
+        if to_inactivate:
+            sb.table("protocols").update({"ativo": False}).in_("id", to_inactivate).execute()
+        if to_delete:
+            sb.table("protocols").delete().in_("id", to_delete).execute()
 
 
 @router.delete("/{protocol_id}", status_code=204)
