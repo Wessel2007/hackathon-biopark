@@ -1,3 +1,43 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  html, body { font-family: 'Geist', 'Inter', system-ui, sans-serif; }
+  body { background: #f7f7f5; color: #0a0a0a; }
+  .num { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
+}
+
+@layer components {
+  /* Logo mark — square rotated 45° with lime inner */
+  .logo-mark { position: relative; }
+  .logo-mark::before, .logo-mark::after {
+    content: ''; position: absolute; inset: 0; border-radius: 4px;
+    transform: rotate(45deg); background: #0a0a0a;
+  }
+  .logo-mark::after { inset: 22%; background: #d4ff3a; }
+
+  .pill { @apply inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium; }
+  .dot  { @apply w-1.5 h-1.5 rounded-full inline-block; }
+
+  /* Animated "live" indicator */
+  .live-dot {
+    @apply w-1.5 h-1.5 rounded-full inline-block;
+    background: #d4ff3a;
+    box-shadow: 0 0 0 4px #d4ff3a40;
+    animation: pulse-ring 2s ease-out infinite;
+  }
+  @keyframes pulse-ring {
+    0%   { box-shadow: 0 0 0 0 #d4ff3a80; }
+    70%  { box-shadow: 0 0 0 6px #d4ff3a00; }
+    100% { box-shadow: 0 0 0 0 #d4ff3a00; }
+  }
+
+  /* Subtle grid bg used on auth screen */
+  .bg-grid {
+    background-image:
+      linear-gradient(#eeede8 1px, transparent 1px),
+      linear-gradient(90deg, #eeede8 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+}

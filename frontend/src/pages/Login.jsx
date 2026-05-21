@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { login } from '../services/api'
-import { Building2, Eye, EyeOff, Shield, Clock, Zap } from 'lucide-react'
+import { Eye, EyeOff, ArrowRight, Activity } from 'lucide-react'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -27,82 +27,47 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex">
-      {/* Left panel */}
-      <div className="hidden lg:flex lg:w-3/5 relative bg-gradient-to-br from-brand-950 via-brand-900 to-brand-800 flex-col justify-between p-12 overflow-hidden">
-        <div className="absolute -top-24 -right-24 w-96 h-96 bg-white/5 rounded-full" />
-        <div className="absolute -bottom-32 -left-32 w-[500px] h-[500px] bg-white/5 rounded-full" />
-        <div className="absolute top-1/2 right-0 w-72 h-72 bg-brand-700/20 rounded-full translate-x-1/2 -translate-y-1/2" />
+    <div className="min-h-screen grid lg:grid-cols-2 bg-paper text-ink">
 
-        <div className="relative z-10 flex items-center gap-3">
-          <div className="w-9 h-9 bg-brand-600 rounded-xl flex items-center justify-center shadow-lg">
-            <Building2 className="text-white" size={18} />
+      {/* ─── LEFT — form ─── */}
+      <div className="flex flex-col justify-between p-8 sm:p-12 bg-surface lg:border-r border-line">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="logo-mark w-7 h-7" />
+            <span className="font-semibold tracking-tight">Biopark <span className="text-muted font-normal">/ Protocolos</span></span>
           </div>
-          <span className="text-white text-xl font-bold tracking-tight">Biopark</span>
-        </div>
-
-        <div className="relative z-10 space-y-8">
-          <div className="space-y-4">
-            <h1 className="text-4xl font-bold text-white leading-tight">
-              Gestão inteligente<br />de protocolos<br />
-              <span className="text-brand-300">públicos</span>
-            </h1>
-            <p className="text-brand-200 text-base leading-relaxed max-w-sm">
-              Centralize e monitore todas as suas tramitações em órgãos públicos em uma única plataforma.
-            </p>
-          </div>
-
-          <div className="space-y-3.5">
-            {[
-              { icon: Zap,    text: 'Consultas automáticas em tempo real' },
-              { icon: Shield, text: 'Alertas de mudança instantâneos' },
-              { icon: Clock,  text: 'Histórico completo de tramitações' },
-            ].map(({ icon: Icon, text }) => (
-              <div key={text} className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-brand-700/60 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Icon size={15} className="text-brand-300" />
-                </div>
-                <span className="text-brand-100 text-sm">{text}</span>
-              </div>
-            ))}
+          <div className="hidden sm:inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-[11px] bg-paper text-muted">
+            <span className="dot bg-accent-green" />
+            todos os sistemas operando
           </div>
         </div>
 
-        <div className="relative z-10 text-brand-500 text-xs">
-          © {new Date().getFullYear()} Biopark · Todos os direitos reservados
-        </div>
-      </div>
-
-      {/* Right panel */}
-      <div className="flex-1 flex items-center justify-center bg-gray-50 p-8">
-        <div className="w-full max-w-sm space-y-8">
-          <div className="lg:hidden flex items-center gap-3">
-            <div className="w-9 h-9 bg-brand-700 rounded-xl flex items-center justify-center">
-              <Building2 className="text-white" size={18} />
-            </div>
-            <span className="text-brand-900 text-xl font-bold">Biopark</span>
+        <div className="w-full max-w-sm">
+          <div className="font-mono text-[11px] uppercase tracking-wider text-muted mb-3">
+            01 / acesso
           </div>
+          <h1 className="text-[40px] sm:text-[44px] font-medium leading-[1.05] tracking-tight">
+            Entre na sua conta
+          </h1>
+          <p className="text-sm text-muted mt-2 mb-8">
+            Continue de onde parou. Acompanhe protocolos em tempo real.
+          </p>
 
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Acesse sua conta</h2>
-            <p className="mt-1 text-gray-500 text-sm">Informe suas credenciais para continuar</p>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-gray-700">E-mail</label>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-muted mb-1.5">E-mail corporativo</label>
               <input
                 type="email"
                 required
-                placeholder="seuemail@empresa.com"
+                placeholder="voce@biopark.com.br"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition shadow-sm"
+                className="w-full px-4 py-3 rounded-xl text-sm bg-paper border border-line-2 outline-none transition focus:ring-2 focus:ring-ink/10 focus:border-ink/30"
               />
             </div>
 
-            <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-gray-700">Senha</label>
+            <div>
+              <label className="block text-xs font-medium text-muted mb-1.5">Senha</label>
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
@@ -110,21 +75,30 @@ export default function Login() {
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 pr-11 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition shadow-sm"
+                  className="w-full px-4 py-3 pr-20 rounded-xl text-sm bg-paper border border-line-2 outline-none transition focus:ring-2 focus:ring-ink/10 focus:border-ink/30"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] font-medium text-muted hover:text-ink px-2 py-1 rounded transition flex items-center gap-1"
                 >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  {showPassword ? <EyeOff size={13} /> : <Eye size={13} />}
+                  {showPassword ? 'ocultar' : 'mostrar'}
                 </button>
               </div>
             </div>
 
+            <div className="flex items-center justify-between text-xs pt-1">
+              <label className="flex items-center gap-2 text-muted cursor-pointer">
+                <input type="checkbox" defaultChecked className="rounded accent-ink" />
+                Manter conectado
+              </label>
+              <a className="font-medium text-ink hover:underline cursor-pointer">Esqueci a senha →</a>
+            </div>
+
             {error && (
-              <div className="flex items-center gap-2.5 bg-red-50 border border-red-100 text-red-600 px-4 py-3 rounded-xl text-sm">
-                <span className="w-1.5 h-1.5 bg-red-500 rounded-full flex-shrink-0" />
+              <div className="flex items-center gap-2.5 bg-red-50 border border-red-100 text-red-700 px-4 py-3 rounded-xl text-sm">
+                <span className="dot bg-accent-red" />
                 {error}
               </div>
             )}
@@ -132,23 +106,91 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-brand-700 hover:bg-brand-800 text-white rounded-xl py-3 text-sm font-semibold transition shadow-md shadow-brand-700/20 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full mt-2 py-3.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 bg-ink text-lime hover:bg-ink-2 transition disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {loading ? (
                 <>
-                  <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
                   </svg>
                   Entrando...
                 </>
-              ) : 'Entrar'}
+              ) : (
+                <>
+                  Acessar plataforma
+                  <ArrowRight size={16} />
+                </>
+              )}
             </button>
           </form>
+        </div>
 
-          <p className="text-center text-xs text-gray-400">
-            Biopark · Gestão de Protocolos Públicos
+        <div className="flex items-center justify-between text-[11px] text-muted-faint">
+          <span>© {new Date().getFullYear()} Biopark · Protocolos</span>
+          <div className="hidden sm:flex gap-4">
+            <span>Termos</span><span>Privacidade</span><span>Status</span>
+          </div>
+        </div>
+      </div>
+
+      {/* ─── RIGHT — product preview ─── */}
+      <div className="hidden lg:flex flex-col justify-between p-12 relative overflow-hidden bg-paper">
+        <div className="absolute inset-0 opacity-60 pointer-events-none bg-grid" />
+
+        <div className="relative z-10">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-medium mb-5 bg-ink text-lime">
+            <span className="live-dot" />
+            Tempo real
+          </div>
+          <h2 className="text-[52px] font-medium leading-[0.98] tracking-tight">
+            Cada protocolo,<br/>
+            <span className="text-muted">cada movimento,</span><br/>
+            no momento exato.
+          </h2>
+          <p className="text-sm text-muted mt-5 max-w-md leading-relaxed">
+            Centralize licenças, alvarás e tramitações públicas. Receba notificações no momento em que algo realmente muda.
           </p>
+        </div>
+
+        {/* Mock product card */}
+        <div className="relative z-10 rounded-2xl overflow-hidden shadow-pop bg-surface border border-line-2">
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-line bg-paper">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-accent-red/70" />
+              <span className="w-2.5 h-2.5 rounded-full bg-accent-amber/70" />
+              <span className="w-2.5 h-2.5 rounded-full bg-accent-green/70" />
+            </div>
+            <div className="font-mono text-[10px] text-muted">biopark.app / protocolos</div>
+            <div className="w-12" />
+          </div>
+
+          <div className="p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <div className="text-[10px] font-mono uppercase tracking-wider text-muted">Atividade · 14d</div>
+                <div className="text-2xl font-semibold num mt-0.5">369 consultas</div>
+              </div>
+              <div className="flex items-center gap-1 text-xs font-medium text-accent-green">
+                <Activity size={12} /> ↑ 24%
+              </div>
+            </div>
+
+            <div className="flex items-end gap-1 h-20 mb-4">
+              {[12,18,14,22,28,19,24,31,26,34,29,38,33,41].map((v, i) => (
+                <div key={i} className="flex-1 rounded-t" style={{ height: `${(v/41)*100}%`, background: i >= 12 ? '#d4ff3a' : '#dfdeda' }} />
+              ))}
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              {[['127','Total'], ['7','Mudanças'], ['18','Pendentes']].map(([n,l]) => (
+                <div key={l} className="rounded-lg p-3 bg-paper">
+                  <div className="text-xs text-muted">{l}</div>
+                  <div className="text-xl font-semibold num">{n}</div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>

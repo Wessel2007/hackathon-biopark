@@ -7,25 +7,25 @@ import {
   AreaChart, Area,
 } from 'recharts'
 import {
-  ArrowLeft, Download, BarChart3, CheckCircle2, ClipboardList,
-  Zap, XCircle, Timer, Building2, Filter,
+  ArrowLeft, Download, CheckCircle2, AlertTriangle,
+  ChevronDown,
 } from 'lucide-react'
 import { getDashboardData, downloadPdf } from '../services/api'
 
+/* Quiet Pro palette for charts */
 const STATUS_COLORS = {
-  'EM ANDAMENTO': '#2563eb',
-  PENDENTE: '#f59e0b',
-  APROVADO: '#10b981',
-  CANCELADO: '#ef4444',
-  REPROVADO: '#dc2626',
+  'EM ANDAMENTO': '#3454ff',
+  PENDENTE:       '#ff8a2a',
+  APROVADO:       '#2a8a55',
+  CANCELADO:      '#e3463a',
+  REPROVADO:      '#c46a4c',
 }
-
-const PALETTE = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16']
+const PALETTE = ['#3454ff', '#2a8a55', '#ff8a2a', '#e3463a', '#7a9112', '#3454ff', '#0a0a0a', '#7c7c78']
 
 const TIPO_MAP = {
-  erro:            { label: 'Erro',            cls: 'bg-red-50 text-red-700 border-red-200' },
-  sem_atualizacao: { label: 'Sem atualização', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
-  duracao_alta:    { label: 'Duração alta',    cls: 'bg-orange-50 text-orange-700 border-orange-200' },
+  erro:            { label: 'Erro',            bg: 'bg-red-50',    fg: 'text-red-700'    },
+  sem_atualizacao: { label: 'Sem atualização', bg: 'bg-amber-50',  fg: 'text-amber-700'  },
+  duracao_alta:    { label: 'Duração alta',    bg: 'bg-orange-50', fg: 'text-orange-700' },
 }
 
 export default function Reports() {
@@ -49,117 +49,166 @@ export default function Reports() {
   })
 
   const kpis = data?.kpis ?? {}
+  const totalConsultas = (data?.consultas_por_periodo ?? []).reduce((a, b) => a + (b.count ?? 0), 0)
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-paper text-ink">
 
-      {/* Navbar */}
-      <nav className="bg-brand-950 border-b border-brand-900/50 text-white sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button onClick={() => navigate('/')} className="text-brand-400 hover:text-white transition">
-              <ArrowLeft size={16} />
-            </button>
-            <div className="w-px h-5 bg-brand-800" />
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 bg-brand-600 rounded-md flex items-center justify-center">
-                <BarChart3 size={12} />
-              </div>
-              <span className="font-semibold text-sm">Painel Executivo</span>
-            </div>
-          </div>
-          <button
-            onClick={downloadPdf}
-            className="flex items-center gap-1.5 bg-brand-800 hover:bg-brand-700 px-3 py-1.5 rounded-lg text-sm transition"
-          >
-            <Download size={13} /> Baixar PDF
+      {/* ═══ NAVBAR ═══ */}
+      <header className="sticky top-0 z-30 h-14 flex items-center justify-between px-6 bg-surface border-b border-line">
+        <div className="flex items-center gap-4">
+          <button onClick={() => navigate('/')} className="w-9 h-9 rounded-lg flex items-center justify-center bg-paper hover:bg-line transition text-ink">
+            <ArrowLeft size={16} />
           </button>
+          <div className="flex items-center gap-2.5">
+            <div className="logo-mark w-6 h-6" />
+            <span className="font-semibold text-sm tracking-tight">Biopark</span>
+            <span className="hidden sm:inline text-[10px] font-mono px-1.5 py-0.5 rounded bg-paper text-muted uppercase tracking-wider">Pro</span>
+          </div>
+          <nav className="hidden sm:flex items-center gap-1 text-sm ml-2">
+            <button onClick={() => navigate('/')} className="px-3 py-1.5 rounded-lg text-muted hover:text-ink hover:bg-paper transition">Protocolos</button>
+            <button className="px-3 py-1.5 rounded-lg font-medium bg-paper text-ink">Relatórios</button>
+          </nav>
         </div>
-      </nav>
+        <button
+          onClick={downloadPdf}
+          className="px-3.5 py-2 rounded-lg text-sm font-semibold flex items-center gap-1.5 bg-ink text-lime hover:bg-ink-2 transition"
+        >
+          <Download size={13} /> Baixar PDF
+        </button>
+      </header>
 
-      {/* Filtros */}
-      <div className="bg-white border-b border-gray-100 sticky top-14 z-20 shadow-sm">
-        <div className="max-w-7xl mx-auto px-6 py-2.5 flex items-center gap-3 flex-wrap">
-          <span className="flex items-center gap-1.5 text-gray-400 text-xs font-medium shrink-0">
-            <Filter size={12} /> Filtros
-          </span>
+      <div className="px-6 py-6 max-w-[1400px] mx-auto">
 
-          <select
-            value={filters.status}
-            onChange={e => setFilters(f => ({ ...f, status: e.target.value }))}
-            className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
-          >
-            <option value="">Todos os status</option>
-            <option value="EM ANDAMENTO">Em Andamento</option>
-            <option value="PENDENTE">Pendente</option>
-            <option value="APROVADO">Aprovado</option>
-            <option value="CANCELADO">Cancelado</option>
-            <option value="REPROVADO">Reprovado</option>
-          </select>
-
-          <select
-            value={filters.ativo}
-            onChange={e => setFilters(f => ({ ...f, ativo: e.target.value }))}
-            className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
-          >
-            <option value="">Ativo e Inativo</option>
-            <option value="true">Apenas Ativos</option>
-            <option value="false">Apenas Inativos</option>
-          </select>
-
-          <input
-            value={filters.projeto}
-            onChange={e => setFilters(f => ({ ...f, projeto: e.target.value }))}
-            placeholder="Projeto..."
-            className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500 w-40"
-          />
-
-          <input
-            value={filters.orgao}
-            onChange={e => setFilters(f => ({ ...f, orgao: e.target.value }))}
-            placeholder="Órgão..."
-            className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500 w-44"
-          />
-
-          {hasFilters && (
-            <button
-              onClick={() => setFilters({ projeto: '', orgao: '', status: '', ativo: '' })}
-              className="text-xs text-brand-600 hover:text-brand-700 font-medium"
-            >
-              Limpar
-            </button>
-          )}
+        {/* ═══ Hero ═══ */}
+        <div className="flex items-end justify-between mb-6 gap-4 flex-wrap">
+          <div>
+            <div className="font-mono text-[11px] uppercase tracking-wider text-muted mb-1">painel executivo</div>
+            <h1 className="text-3xl font-semibold tracking-tight">Performance da operação</h1>
+            <p className="text-sm text-muted mt-1">
+              {kpis.total ?? 0} protocolos analisados · Atualizado agora
+            </p>
+          </div>
         </div>
-      </div>
 
-      {/* Conteúdo */}
-      <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* ═══ Filter chips ═══ */}
+        <div className="rounded-2xl bg-surface border border-line p-4 mb-4">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-medium text-muted mr-1">Filtros:</span>
+
+            <FilterChip
+              value={filters.status}
+              onChange={v => setFilters(f => ({ ...f, status: v }))}
+              placeholder="Todos os status"
+              options={[
+                ['EM ANDAMENTO', 'Em andamento'],
+                ['PENDENTE',     'Pendente'],
+                ['APROVADO',     'Aprovado'],
+                ['CANCELADO',    'Cancelado'],
+                ['REPROVADO',    'Reprovado'],
+              ]}
+            />
+            <FilterChip
+              value={filters.ativo}
+              onChange={v => setFilters(f => ({ ...f, ativo: v }))}
+              placeholder="Ativo e inativo"
+              options={[['true', 'Apenas ativos'], ['false', 'Apenas inativos']]}
+            />
+            <input
+              value={filters.projeto}
+              onChange={e => setFilters(f => ({ ...f, projeto: e.target.value }))}
+              placeholder="Projeto…"
+              className="text-sm border border-line-2 rounded-lg px-3 py-1.5 bg-paper text-ink placeholder:text-muted-faint outline-none focus:ring-2 focus:ring-ink/10 focus:border-ink/30 w-40"
+            />
+            <input
+              value={filters.orgao}
+              onChange={e => setFilters(f => ({ ...f, orgao: e.target.value }))}
+              placeholder="Órgão…"
+              className="text-sm border border-line-2 rounded-lg px-3 py-1.5 bg-paper text-ink placeholder:text-muted-faint outline-none focus:ring-2 focus:ring-ink/10 focus:border-ink/30 w-44"
+            />
+
+            {hasFilters && (
+              <button
+                onClick={() => setFilters({ projeto: '', orgao: '', status: '', ativo: '' })}
+                className="text-xs text-muted hover:text-ink font-medium ml-auto"
+              >
+                Limpar filtros
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* ═══ CONTENT ═══ */}
         {isLoading ? (
-          <div className="flex items-center justify-center py-24 gap-3 text-gray-400 text-sm">
-            <svg className="animate-spin h-5 w-5 text-brand-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <div className="flex items-center justify-center py-24 gap-3 text-muted text-sm">
+            <svg className="animate-spin h-5 w-5 text-ink" viewBox="0 0 24 24" fill="none">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
             </svg>
-            Carregando painel...
+            Carregando painel…
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-4">
 
-            {/* KPI Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-4">
-              <KpiCard label="Total de Protocolos"  value={kpis.total ?? 0}               icon={ClipboardList} accent="blue"   />
-              <KpiCard label="Protocolos Ativos"    value={kpis.ativos ?? 0}              icon={CheckCircle2}  accent="green"  />
-              <KpiCard label="Mudanças Recentes"    value={kpis.com_mudanca_recente ?? 0} icon={Zap}           accent="amber"  />
-              <KpiCard label="Erros de Consulta"    value={kpis.erros_consulta ?? 0}      icon={XCircle}       accent="red"    />
-              <KpiCard label="Duração Média (dias)" value={kpis.duracao_media ?? 0}       icon={Timer}         accent="violet" />
-              <KpiCard label="Maior Órgão"          value={kpis.orgao_top ?? '—'}         icon={Building2}     accent="slate"  small />
+            {/* ═══ KPI ROW ═══ */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
+              <Kpi label="Total"               value={kpis.total ?? 0}                tone="neutral" />
+              <Kpi label="Ativos"              value={kpis.ativos ?? 0}               tone="green" delta={`${Math.round(((kpis.ativos ?? 0) / Math.max(kpis.total ?? 1, 1)) * 100)}%`} />
+              <Kpi label="Mudanças recentes"   value={kpis.com_mudanca_recente ?? 0}  tone="lime"  delta="hoje" />
+              <Kpi label="Erros de consulta"   value={kpis.erros_consulta ?? 0}       tone={kpis.erros_consulta > 0 ? 'red' : 'green'} />
+              <Kpi label="Duração média (d)"   value={kpis.duracao_media ?? 0}        tone="neutral" />
+              <Kpi label="Maior órgão"         value={kpis.orgao_top ?? '—'}          tone="neutral" small />
             </div>
 
-            {/* Gráficos: pizza + barras */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card title="Por Status" subtitle="Distribuição atual de protocolos">
+            {/* ═══ Charts row 1 — Timeline + Donut ═══ */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
+
+              <Card
+                className="lg:col-span-8"
+                title="Consultas automáticas"
+                subtitle="Últimos 30 dias"
+                right={
+                  <div className="flex items-center gap-5">
+                    <Metric label="Total" value={totalConsultas} />
+                    <Metric label="Por dia (méd.)" value={(data?.consultas_por_periodo?.length ?? 0) > 0 ? Math.round(totalConsultas / data.consultas_por_periodo.length) : 0} />
+                  </div>
+                }
+              >
+                <ResponsiveContainer width="100%" height={210}>
+                  <AreaChart data={data?.consultas_por_periodo ?? []} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="grad-consultas" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%"  stopColor="#d4ff3a" stopOpacity={0.45} />
+                        <stop offset="95%" stopColor="#d4ff3a" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#eeede8" vertical={false} />
+                    <XAxis
+                      dataKey="data"
+                      tick={{ fontSize: 10, fill: '#7c7c78' }}
+                      axisLine={false} tickLine={false}
+                      interval={4}
+                      tickFormatter={d => d.slice(5).replace('-', '/')}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 10, fill: '#7c7c78' }}
+                      axisLine={false} tickLine={false}
+                      allowDecimals={false}
+                    />
+                    <Tooltip
+                      contentStyle={{ background: '#0a0a0a', color: '#fff', border: 'none', borderRadius: 8, fontSize: 12 }}
+                      labelStyle={{ color: '#d4ff3a' }}
+                      labelFormatter={d => new Date(d + 'T12:00:00').toLocaleDateString('pt-BR')}
+                      formatter={v => [v, 'consultas']}
+                    />
+                    <Area type="monotone" dataKey="count" stroke="#0a0a0a" strokeWidth={2.5} fill="url(#grad-consultas)" dot={false} activeDot={{ r: 5, fill: '#d4ff3a', stroke: '#0a0a0a', strokeWidth: 2 }} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </Card>
+
+              <Card className="lg:col-span-4" title="Por status" subtitle="Distribuição atual">
                 {!(data?.por_status?.length) ? <EmptyChart /> : (
-                  <ResponsiveContainer width="100%" height={230}>
+                  <ResponsiveContainer width="100%" height={210}>
                     <PieChart>
                       <Pie
                         data={data.por_status}
@@ -167,176 +216,139 @@ export default function Reports() {
                         nameKey="status"
                         cx="50%" cy="50%"
                         outerRadius={78}
-                        innerRadius={42}
+                        innerRadius={48}
                         paddingAngle={2}
+                        stroke="#fff"
+                        strokeWidth={2}
                       >
                         {data.por_status.map((entry, i) => (
                           <Cell key={i} fill={STATUS_COLORS[entry.status] ?? PALETTE[i % PALETTE.length]} />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(v, n) => [v, n]} />
-                      <Legend iconSize={10} iconType="circle" wrapperStyle={{ fontSize: 11 }} />
+                      <Tooltip
+                        contentStyle={{ background: '#0a0a0a', color: '#fff', border: 'none', borderRadius: 8, fontSize: 12 }}
+                        labelStyle={{ color: '#d4ff3a' }}
+                      />
+                      <Legend iconSize={8} iconType="circle" wrapperStyle={{ fontSize: 11, color: '#7c7c78' }} />
                     </PieChart>
                   </ResponsiveContainer>
                 )}
               </Card>
-
-              <div className="lg:col-span-2">
-                <Card title="Por Órgão" subtitle="Top 8 órgãos por volume de protocolos">
-                  {!(data?.por_orgao?.length) ? <EmptyChart /> : (
-                    <ResponsiveContainer width="100%" height={230}>
-                      <BarChart
-                        layout="vertical"
-                        data={data.por_orgao}
-                        margin={{ top: 0, right: 16, left: 0, bottom: 0 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
-                        <XAxis
-                          type="number"
-                          tick={{ fontSize: 10 }}
-                          axisLine={false}
-                          tickLine={false}
-                          allowDecimals={false}
-                        />
-                        <YAxis
-                          type="category"
-                          dataKey="orgao"
-                          width={132}
-                          tick={{ fontSize: 10 }}
-                          axisLine={false}
-                          tickLine={false}
-                          tickFormatter={v => v.length > 20 ? v.slice(0, 20) + '…' : v}
-                        />
-                        <Tooltip cursor={{ fill: '#f8fafc' }} />
-                        <Bar dataKey="count" fill="#2563eb" radius={[0, 4, 4, 0]} maxBarSize={18} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  )}
-                </Card>
-              </div>
             </div>
 
-            {/* Gráfico de linha */}
-            <Card title="Consultas Realizadas" subtitle="Histórico dos últimos 30 dias">
-              <ResponsiveContainer width="100%" height={180}>
-                <AreaChart
-                  data={data?.consultas_por_periodo ?? []}
-                  margin={{ top: 4, right: 8, left: -20, bottom: 0 }}
-                >
-                  <defs>
-                    <linearGradient id="gradConsultas" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%"  stopColor="#2563eb" stopOpacity={0.12} />
-                      <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                  <XAxis
-                    dataKey="data"
-                    tick={{ fontSize: 10 }}
-                    axisLine={false}
-                    tickLine={false}
-                    interval={4}
-                    tickFormatter={d => d.slice(5).replace('-', '/')}
-                  />
-                  <YAxis
-                    tick={{ fontSize: 10 }}
-                    axisLine={false}
-                    tickLine={false}
-                    allowDecimals={false}
-                  />
-                  <Tooltip
-                    labelFormatter={d => new Date(d + 'T12:00:00').toLocaleDateString('pt-BR')}
-                    formatter={v => [v, 'consultas']}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="count"
-                    stroke="#2563eb"
-                    strokeWidth={2}
-                    fill="url(#gradConsultas)"
-                    dot={false}
-                    activeDot={{ r: 4 }}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </Card>
+            {/* ═══ Charts row 2 — Org volume + Críticos ═══ */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
 
-            {/* Protocolos críticos + Alertas */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card className="lg:col-span-7" title="Por órgão" subtitle="Top 8 entidades por volume">
+                {!(data?.por_orgao?.length) ? <EmptyChart /> : (
+                  <ResponsiveContainer width="100%" height={260}>
+                    <BarChart
+                      layout="vertical"
+                      data={data.por_orgao}
+                      margin={{ top: 4, right: 16, left: 0, bottom: 0 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#eeede8" />
+                      <XAxis type="number" tick={{ fontSize: 10, fill: '#7c7c78' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                      <YAxis
+                        type="category"
+                        dataKey="orgao"
+                        width={132}
+                        tick={{ fontSize: 11, fill: '#0a0a0a' }}
+                        axisLine={false} tickLine={false}
+                        tickFormatter={v => v.length > 20 ? v.slice(0, 20) + '…' : v}
+                      />
+                      <Tooltip
+                        cursor={{ fill: '#f7f7f5' }}
+                        contentStyle={{ background: '#0a0a0a', color: '#fff', border: 'none', borderRadius: 8, fontSize: 12 }}
+                        labelStyle={{ color: '#d4ff3a' }}
+                      />
+                      <Bar dataKey="count" fill="#0a0a0a" radius={[0, 6, 6, 0]} maxBarSize={20} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </Card>
 
               <Card
-                title="Protocolos Críticos"
+                className="lg:col-span-5"
+                title="Protocolos críticos"
                 subtitle={`${(data?.protocolos_criticos ?? []).length} identificado(s)`}
+                right={(data?.protocolos_criticos ?? []).length > 0 && (
+                  <span className="pill bg-red-50 text-red-700">{data.protocolos_criticos.length}</span>
+                )}
               >
                 {!(data?.protocolos_criticos?.length) ? (
                   <div className="flex items-center gap-2 text-emerald-600 py-5 text-sm">
                     <CheckCircle2 size={16} /> Nenhum protocolo crítico
                   </div>
                 ) : (
-                  <div className="divide-y divide-gray-50 -mx-5">
+                  <div className="space-y-2 max-h-[230px] overflow-y-auto -mr-2 pr-2">
                     {data.protocolos_criticos.slice(0, 8).map(p => {
-                      const t = TIPO_MAP[p.tipo] ?? { label: p.tipo, cls: 'bg-gray-100 text-gray-600 border-gray-200' }
+                      const t = TIPO_MAP[p.tipo] ?? { label: p.tipo, bg: 'bg-paper', fg: 'text-muted' }
                       return (
-                        <div key={p.id} className="px-5 py-3 flex items-center justify-between gap-3 hover:bg-gray-50/60 transition-colors">
-                          <div className="min-w-0">
+                        <div key={p.id} className="flex items-center justify-between gap-3 p-3 rounded-lg bg-paper hover:bg-line transition">
+                          <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-mono text-xs text-gray-500">{p.protocolo}</span>
-                              <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${t.cls}`}>
-                                {t.label}
-                              </span>
+                              <span className="font-mono text-xs text-ink">{p.protocolo}</span>
+                              <span className={`pill ${t.bg} ${t.fg}`}>{t.label}</span>
                             </div>
-                            <p className="text-xs text-gray-400 mt-0.5 truncate">
+                            <p className="text-xs text-muted mt-1 truncate">
                               {p.projeto}{p.orgao ? ` · ${p.orgao}` : ''}
                             </p>
                           </div>
-                          <span className="text-xs text-gray-400 shrink-0 tabular-nums">
-                            {p.duracao_dias != null ? `${p.duracao_dias}d` : '—'}
-                          </span>
+                          <div className="text-right shrink-0">
+                            <div className="text-base font-semibold num text-accent-red">{p.duracao_dias != null ? `${p.duracao_dias}d` : '—'}</div>
+                            <div className="text-[10px] font-mono uppercase text-muted">sem ação</div>
+                          </div>
                         </div>
                       )
                     })}
                   </div>
                 )}
               </Card>
+            </div>
 
-              <Card
-                title="Alertas Recentes"
-                subtitle={`${(data?.alertas_recentes ?? []).length} alerta(s)`}
-              >
-                {!(data?.alertas_recentes?.length) ? (
-                  <div className="flex items-center gap-2 text-emerald-600 py-5 text-sm">
-                    <CheckCircle2 size={16} /> Nenhum alerta recente
-                  </div>
-                ) : (
-                  <div className="divide-y divide-gray-50 -mx-5">
-                    {data.alertas_recentes.slice(0, 8).map((a, i) => (
-                      <div key={i} className="px-5 py-3 flex items-start gap-3 hover:bg-gray-50/60 transition-colors">
-                        <div className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${a.tipo === 'erro' ? 'bg-red-500' : 'bg-amber-400'}`} />
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-mono text-xs text-gray-500">{a.protocolo}</span>
-                            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${
-                              a.tipo === 'erro'
-                                ? 'bg-red-50 text-red-700 border-red-200'
-                                : 'bg-amber-50 text-amber-700 border-amber-200'
+            {/* ═══ Alertas — timeline ═══ */}
+            <Card title="Alertas recentes" subtitle={`${(data?.alertas_recentes ?? []).length} alerta(s)`}>
+              {!(data?.alertas_recentes?.length) ? (
+                <div className="flex items-center gap-2 text-emerald-600 py-5 text-sm">
+                  <CheckCircle2 size={16} /> Nenhum alerta recente
+                </div>
+              ) : (
+                <div className="relative pl-6">
+                  <div className="absolute left-[7px] top-2 bottom-2 w-px bg-line-2" />
+                  {data.alertas_recentes.slice(0, 12).map((a, i) => (
+                    <div key={i} className="relative pb-4 last:pb-0">
+                      <div
+                        className="absolute -left-[22px] top-1 w-3 h-3 rounded-full"
+                        style={{
+                          background: a.tipo === 'erro' ? '#e3463a' : '#d4ff3a',
+                          boxShadow: `0 0 0 4px #fff, 0 0 0 5px ${a.tipo === 'erro' ? '#e3463a33' : '#d4ff3a55'}`,
+                        }}
+                      />
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                            <span className="font-mono text-xs font-medium text-ink">{a.protocolo}</span>
+                            <span className={`pill ${
+                              a.tipo === 'erro' ? 'bg-red-50 text-red-700' : 'bg-lime-soft text-lime-deep'
                             }`}>
-                              {a.tipo === 'erro' ? 'Erro' : 'Mudança'}
+                              {a.tipo === 'erro' ? 'erro' : 'mudança'}
                             </span>
                           </div>
-                          <p className="text-xs text-gray-400 mt-0.5 truncate">{a.descricao}</p>
-                          <p className="text-[10px] text-gray-300 mt-0.5">
-                            {a.data
-                              ? new Date(a.data).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
-                              : '—'}
-                          </p>
+                          <div className="text-sm text-ink-2">{a.descricao}</div>
+                        </div>
+                        <div className="text-[11px] font-mono uppercase tracking-wider shrink-0 text-muted">
+                          {a.data
+                            ? new Date(a.data).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+                            : '—'}
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </Card>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
 
-            </div>
           </div>
         )}
       </div>
@@ -344,49 +356,64 @@ export default function Reports() {
   )
 }
 
-function KpiCard({ label, value, icon: Icon, accent, small }) {
-  const accents = {
-    blue:   { bar: 'bg-brand-600',   icon: 'bg-brand-50 text-brand-600' },
-    green:  { bar: 'bg-emerald-500', icon: 'bg-emerald-50 text-emerald-600' },
-    amber:  { bar: 'bg-amber-400',   icon: 'bg-amber-50 text-amber-600' },
-    red:    { bar: 'bg-red-500',     icon: 'bg-red-50 text-red-600' },
-    violet: { bar: 'bg-violet-500',  icon: 'bg-violet-50 text-violet-600' },
-    slate:  { bar: 'bg-slate-400',   icon: 'bg-slate-50 text-slate-600' },
-  }
-  const { bar, icon } = accents[accent] ?? accents.blue
+/* ──── helpers ──── */
+
+function Kpi({ label, value, tone, delta, small }) {
+  const toneClr = { green: 'text-accent-green', amber: 'text-accent-amber', red: 'text-accent-red', lime: 'text-lime-deep', neutral: 'text-muted' }[tone] || 'text-muted'
   return (
-    <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
-      <div className={`h-0.5 ${bar}`} />
-      <div className="p-4 flex items-start justify-between">
-        <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider leading-tight">{label}</p>
-          <p className={`font-bold text-gray-900 mt-1.5 leading-none tabular-nums ${small ? 'text-sm truncate' : 'text-3xl'}`}>
-            {value}
-          </p>
-        </div>
-        <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ml-2 ${icon}`}>
-          <Icon size={16} />
-        </div>
+    <div className="rounded-xl p-4 bg-surface border border-line">
+      <div className="font-mono text-[10px] uppercase tracking-wider text-muted mb-2 truncate">{label}</div>
+      <div className="flex items-baseline justify-between gap-2">
+        <div className={`font-medium num tracking-tight ${small ? 'text-base truncate' : 'text-3xl'}`}>{value}</div>
+        {delta && <div className={`text-[11px] font-medium ${toneClr}`}>{delta}</div>}
       </div>
     </div>
   )
 }
 
-function Card({ title, subtitle, children }) {
+function Card({ title, subtitle, right, children, className = '' }) {
   return (
-    <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
-      <div className="px-5 pt-4 pb-3 border-b border-gray-50">
-        <h3 className="font-semibold text-gray-800 text-sm">{title}</h3>
-        {subtitle && <p className="text-xs text-gray-400 mt-0.5">{subtitle}</p>}
+    <div className={`rounded-2xl bg-surface border border-line overflow-hidden ${className}`}>
+      <div className="px-5 pt-4 pb-3 border-b border-line flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="font-semibold text-sm text-ink">{title}</h3>
+          {subtitle && <p className="text-xs text-muted mt-0.5">{subtitle}</p>}
+        </div>
+        {right && <div className="shrink-0">{right}</div>}
       </div>
       <div className="px-5 py-4">{children}</div>
     </div>
   )
 }
 
+function Metric({ label, value }) {
+  return (
+    <div className="text-right">
+      <div className="text-[10px] font-mono uppercase text-muted">{label}</div>
+      <div className="text-base font-semibold num">{value}</div>
+    </div>
+  )
+}
+
+function FilterChip({ value, onChange, placeholder, options }) {
+  return (
+    <div className="relative">
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        className="appearance-none bg-paper border border-line-2 rounded-lg pl-3 pr-7 py-1.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-ink/10 focus:border-ink/30 cursor-pointer transition"
+      >
+        <option value="">{placeholder}</option>
+        {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+      </select>
+      <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
+    </div>
+  )
+}
+
 function EmptyChart() {
   return (
-    <div className="h-[230px] flex items-center justify-center text-gray-300 text-sm">
+    <div className="h-[210px] flex items-center justify-center text-muted-faint text-sm">
       Sem dados disponíveis
     </div>
   )
