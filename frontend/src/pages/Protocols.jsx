@@ -19,6 +19,8 @@ export default function Protocols() {
   const [filterProjeto, setFilterProjeto] = useState('')
   const [formError, setFormError] = useState(null)
   const [pageError, setPageError] = useState(null)
+  const [importing, setImporting] = useState(false)
+  const [importResult, setImportResult] = useState(null)
 
   const { data = [], isLoading } = useQuery({
     queryKey: ['protocols', filterProjeto],
@@ -77,9 +79,16 @@ export default function Protocols() {
   async function handleImport(e) {
     const file = e.target.files[0]
     if (!file) return
-    const result = await importSpreadsheet(file)
-    alert(`Importados: ${result.importados?.length ?? 0} | Ignorados: ${result.ignorados?.length ?? 0} | Erros: ${result.erros?.length ?? 0}`)
-    qc.invalidateQueries(['protocols'])
+    e.target.value = ''
+    setImporting(true)
+    setImportResult(null)
+    try {
+      const result = await importSpreadsheet(file)
+      setImportResult(result)
+      qc.invalidateQueries(['protocols'])
+    } finally {
+      setImporting(false)
+    }
   }
 
   const campos = [
@@ -153,6 +162,36 @@ export default function Protocols() {
                   {saveMut.isPending ? 'Salvando...' : 'Salvar'}
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {importing && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl shadow-xl px-10 py-8 flex flex-col items-center gap-4">
+              <svg className="animate-spin h-8 w-8 text-brand-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+              </svg>
+              <p className="text-gray-700 font-medium">Importando planilha...</p>
+              <p className="text-gray-400 text-xs">Isso pode levar alguns instantes.</p>
+            </div>
+          </div>
+        )}
+
+        {importResult && (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl shadow-xl p-6 w-72 flex flex-col gap-3">
+              <h3 className="text-base font-semibold text-gray-800">Importação concluída</h3>
+              <div className="text-sm space-y-1">
+                <p className="text-green-700">Importados: <span className="font-bold">{importResult.importados?.length ?? 0}</span></p>
+                <p className="text-yellow-700">Ignorados: <span className="font-bold">{importResult.ignorados?.length ?? 0}</span></p>
+                <p className="text-red-700">Erros: <span className="font-bold">{importResult.erros?.length ?? 0}</span></p>
+              </div>
+              <button onClick={() => setImportResult(null)}
+                className="mt-1 self-end text-sm px-4 py-2 bg-brand-700 text-white rounded-lg hover:bg-brand-900">
+                OK
+              </button>
             </div>
           </div>
         )}
