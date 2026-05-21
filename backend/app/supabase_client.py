@@ -87,8 +87,6 @@ class SupabaseTable:
 
     def execute(self):
         headers = HEADERS.copy()
-        if self._single:
-            headers["Accept"] = "application/vnd.pgrst.object+json"
 
         # Para INSERT/UPDATE: pede representação completa incluindo todos os campos
         if self._method in ("POST", "PATCH"):
@@ -107,12 +105,21 @@ class SupabaseTable:
                 r = client.delete(self._url, headers=headers, params=self._params)
 
         r.raise_for_status()
-        body = r.json() if r.content else (None if self._single else [])
+        body = r.json() if r.content else []
 
-        class Result:
+        # maybe_single(): retorna primeiro elemento ou None (sem usar Accept header
+        # que causava 406 no PostgREST quando não havia linhas)
+        if self._single:
+            data = body[0] if body else None
+        else:
             data = body
 
-        return Result()
+        class Result:
+            pass
+
+        result = Result()
+        result.data = data
+        return result
 
 
 class SupabaseClient:

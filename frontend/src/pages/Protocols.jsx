@@ -17,6 +17,8 @@ export default function Protocols() {
   const [editItem, setEditItem] = useState(null)
   const [form, setForm] = useState(EMPTY_FORM)
   const [filterProjeto, setFilterProjeto] = useState('')
+  const [formError, setFormError] = useState(null)
+  const [pageError, setPageError] = useState(null)
 
   const { data = [], isLoading } = useQuery({
     queryKey: ['protocols', filterProjeto],
@@ -25,13 +27,37 @@ export default function Protocols() {
 
   const saveMut = useMutation({
     mutationFn: (d) => editItem ? updateProtocol(editItem.id, d) : createProtocol(d),
-    onSuccess: () => { qc.invalidateQueries(['protocols']); setShowForm(false); setEditItem(null); setForm(EMPTY_FORM) },
+    onSuccess: () => {
+      qc.invalidateQueries(['protocols'])
+      setShowForm(false)
+      setEditItem(null)
+      setForm(EMPTY_FORM)
+      setFormError(null)
+    },
+    onError: (err) => {
+      const msg = err.response?.data?.detail || err.message || 'Erro ao salvar protocolo'
+      setFormError(typeof msg === 'object' ? JSON.stringify(msg) : msg)
+    },
   })
 
   const delMut = useMutation({
     mutationFn: (id) => deleteProtocol(id),
-    onSuccess: () => qc.invalidateQueries(['protocols']),
+    onSuccess: () => { qc.invalidateQueries(['protocols']); setPageError(null) },
+    onError: (err) => {
+      const msg = err.response?.data?.detail || err.message || 'Erro ao excluir protocolo'
+      setPageError(typeof msg === 'object' ? JSON.stringify(msg) : msg)
+    },
   })
+
+  function handleSave() {
+    if (!form.projeto?.trim()) return setFormError('Projeto é obrigatório')
+    if (!form.protocolo?.trim()) return setFormError('Protocolo é obrigatório')
+    if (!form.atividade?.trim()) return setFormError('Atividade é obrigatória')
+    if (!form.orgao_site_consultado?.trim()) return setFormError('Órgão / Site é obrigatório')
+    if (!form.data_abertura) return setFormError('Data de Abertura é obrigatória')
+    setFormError(null)
+    saveMut.mutate(form)
+  }
 
   const queryMut = useMutation({
     mutationFn: (id) => runSingleQuery(id),
@@ -84,6 +110,12 @@ export default function Protocols() {
       </nav>
 
       <div className="max-w-7xl mx-auto p-6 space-y-4">
+        {pageError && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm flex justify-between">
+            <span>{pageError}</span>
+            <button onClick={() => setPageError(null)} className="font-bold ml-4">×</button>
+          </div>
+        )}
         <input
           placeholder="Filtrar por projeto..."
           value={filterProjeto}
@@ -114,9 +146,14 @@ export default function Protocols() {
                   <label htmlFor="ativo" className="text-sm">Ativo</label>
                 </div>
               </div>
+              {formError && (
+                <div className="mt-3 bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-sm">
+                  {formError}
+                </div>
+              )}
               <div className="flex justify-end gap-2 mt-4">
-                <button onClick={() => { setShowForm(false); setEditItem(null) }} className="text-sm px-4 py-2 border rounded-lg hover:bg-gray-50">Cancelar</button>
-                <button onClick={() => saveMut.mutate(form)} disabled={saveMut.isPending}
+                <button onClick={() => { setShowForm(false); setEditItem(null); setFormError(null) }} className="text-sm px-4 py-2 border rounded-lg hover:bg-gray-50">Cancelar</button>
+                <button onClick={handleSave} disabled={saveMut.isPending}
                   className="text-sm px-4 py-2 bg-brand-700 text-white rounded-lg hover:bg-brand-900 disabled:opacity-50">
                   {saveMut.isPending ? 'Salvando...' : 'Salvar'}
                 </button>
