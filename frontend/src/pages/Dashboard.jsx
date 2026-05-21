@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import AgentChat from '../components/AgentChat'
+import { useToast } from '../components/Toast'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   getDashboardData, downloadPdf, runAllQueries,
@@ -42,6 +43,7 @@ const CAMPOS = [
 export default function Dashboard() {
   const navigate = useNavigate()
   const qc = useQueryClient()
+  const { toast } = useToast()
 
   /* ─── filtros ─── */
   const [searchQuery,   setSearchQuery]   = useState('')
@@ -132,6 +134,10 @@ export default function Dashboard() {
   const queryMut = useMutation({
     mutationFn: (id) => runSingleQuery(id),
     onSuccess: async (res) => { await invalidateAll(); setQueryResult(res) },
+    onError: (err) => {
+      const msg = err.response?.data?.detail || err.message || 'Falha ao consultar protocolo'
+      toast(typeof msg === 'object' ? JSON.stringify(msg) : msg, 'error')
+    },
   })
 
   const bulkDelMut = useMutation({
@@ -150,8 +156,13 @@ export default function Dashboard() {
   /* ─── handlers ─── */
   function handleLogout() { localStorage.removeItem('token'); localStorage.removeItem('reports_token'); navigate('/login') }
   async function handleRunAll() {
-    await runAllQueries()
-    setTimeout(() => invalidateAll(), 3000)
+    try {
+      await runAllQueries()
+      setTimeout(() => invalidateAll(), 3000)
+    } catch (err) {
+      const msg = err.response?.data?.detail || err.message || 'Falha ao consultar protocolos'
+      toast(typeof msg === 'object' ? JSON.stringify(msg) : msg, 'error')
+    }
   }
 
   function handleSave() {
