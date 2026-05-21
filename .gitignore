@@ -16,7 +16,6 @@ env/
 *.sqlite3
 
 # Env
-.env
 .env.local
 .env.*.local
 
