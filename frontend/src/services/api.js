@@ -70,8 +70,8 @@ export const getEvidenceUrl = (historyId) =>
 
 // Reports
 export const getDashboardData = (params) => api.get('/reports/dashboard-data', { params }).then((r) => r.data)
-export const downloadPdf = () =>
-  api.get('/reports/pdf', { responseType: 'blob' }).then((r) => {
+export const downloadPdf = (params = {}) =>
+  api.get('/reports/pdf', { params, responseType: 'blob' }).then((r) => {
     const url = URL.createObjectURL(r.data)
     const a = document.createElement('a')
     a.href = url

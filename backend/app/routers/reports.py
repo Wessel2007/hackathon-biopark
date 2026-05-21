@@ -16,7 +16,6 @@ _NAN_STRINGS = {"nan", "none", "nat", "n/a", ""}
 
 
 def _clean_str(v) -> str:
-    """Normaliza campo de texto do banco — converte NaN pandas e strings vazias para '—'."""
     if not v:
         return "—"
     s = str(v).strip()
@@ -36,9 +35,50 @@ def _calc_duracao(p: dict) -> int | None:
         return None
 
 
+def _apply_filters(q, projeto, orgao, status, ativo, atribuido_a, situacao, data_abertura_inicio, data_abertura_fim):
+    if projeto:
+        q = q.ilike("projeto", f"%{projeto}%")
+    if orgao:
+        q = q.ilike("orgao_site_consultado", f"%{orgao}%")
+    if status:
+        q = q.eq("status", status)
+    if ativo is not None:
+        q = q.eq("ativo", ativo)
+    if atribuido_a:
+        q = q.ilike("atribuido_a", f"%{atribuido_a}%")
+    if situacao:
+        q = q.ilike("situacao", f"%{situacao}%")
+    if data_abertura_inicio:
+        q = q.gte("data_abertura", str(data_abertura_inicio))
+    if data_abertura_fim:
+        q = q.lte("data_abertura", str(data_abertura_fim))
+    return q
+
+
 @router.get("/pdf")
-def get_pdf_report(sb: SupabaseClient = Depends(get_supabase), _: str = Depends(get_current_user)):
-    pdf_bytes = generate_pdf_report(sb)
+def get_pdf_report(
+    projeto: Optional[str] = Query(default=None),
+    orgao: Optional[str] = Query(default=None),
+    status: Optional[str] = Query(default=None),
+    ativo: Optional[bool] = Query(default=None),
+    atribuido_a: Optional[str] = Query(default=None),
+    situacao: Optional[str] = Query(default=None),
+    data_abertura_inicio: Optional[date] = Query(default=None),
+    data_abertura_fim: Optional[date] = Query(default=None),
+    sb: SupabaseClient = Depends(get_supabase),
+    _: str = Depends(get_current_user),
+):
+    filters = {
+        "projeto": projeto,
+        "orgao": orgao,
+        "status": status,
+        "ativo": ativo,
+        "atribuido_a": atribuido_a,
+        "situacao": situacao,
+        "data_abertura_inicio": data_abertura_inicio,
+        "data_abertura_fim": data_abertura_fim,
+    }
+    pdf_bytes = generate_pdf_report(sb, filters)
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",
@@ -52,18 +92,15 @@ def get_dashboard_data(
     orgao: Optional[str] = Query(default=None),
     status: Optional[str] = Query(default=None),
     ativo: Optional[bool] = Query(default=None),
+    atribuido_a: Optional[str] = Query(default=None),
+    situacao: Optional[str] = Query(default=None),
+    data_abertura_inicio: Optional[date] = Query(default=None),
+    data_abertura_fim: Optional[date] = Query(default=None),
     sb: SupabaseClient = Depends(get_supabase),
     _: str = Depends(get_current_user),
 ):
     q = sb.table("protocols").select("*, query_history(*)")
-    if projeto:
-        q = q.ilike("projeto", f"%{projeto}%")
-    if orgao:
-        q = q.ilike("orgao_site_consultado", f"%{orgao}%")
-    if status:
-        q = q.eq("status", status)
-    if ativo is not None:
-        q = q.eq("ativo", ativo)
+    q = _apply_filters(q, projeto, orgao, status, ativo, atribuido_a, situacao, data_abertura_inicio, data_abertura_fim)
     protocols = q.execute().data
 
     today = date.today()
@@ -71,7 +108,7 @@ def get_dashboard_data(
 
     # KPIs
     total = len(protocols)
-    ativos = sum(1 for p in protocols if p.get("ativo"))
+    ativos_count = sum(1 for p in protocols if p.get("ativo"))
     com_mudanca = sum(
         1 for p in protocols
         if p.get("query_history") and p["query_history"][-1].get("houve_mudanca")
@@ -94,6 +131,10 @@ def get_dashboard_data(
 
     # Por órgão (bar chart, top 8)
     por_orgao = [{"orgao": o, "count": c} for o, c in orgao_counter.most_common(8)]
+
+    # Por atribuído (bar chart)
+    atribuido_counter = Counter(_clean_str(p.get("atribuido_a")) for p in protocols)
+    por_atribuido = [{"atribuido_a": a, "count": c} for a, c in atribuido_counter.most_common(8)]
 
     # Consultas por período (area chart, last 30 days)
     periodo: dict = {
@@ -154,7 +195,7 @@ def get_dashboard_data(
     alertas.sort(key=lambda x: x["data"], reverse=True)
     alertas_recentes = alertas[:15]
 
-    # Por projeto (backward compat com Dashboard.jsx)
+    # Por projeto
     por_projeto: dict = {}
     for p, dur in protocols_dur:
         hist = p.get("query_history") or []
@@ -172,7 +213,7 @@ def get_dashboard_data(
     return {
         "kpis": {
             "total": total,
-            "ativos": ativos,
+            "ativos": ativos_count,
             "com_mudanca_recente": com_mudanca,
             "erros_consulta": erros_consulta,
             "duracao_media": duracao_media,
@@ -180,12 +221,12 @@ def get_dashboard_data(
         },
         "por_status": por_status,
         "por_orgao": por_orgao,
+        "por_atribuido": por_atribuido,
         "consultas_por_periodo": consultas_por_periodo,
         "protocolos_criticos": protocolos_criticos[:20],
         "alertas_recentes": alertas_recentes,
         "por_projeto": por_projeto,
-        # backward compat
         "total": total,
-        "ativos": ativos,
+        "ativos": ativos_count,
         "com_mudanca_recente": com_mudanca,
     }

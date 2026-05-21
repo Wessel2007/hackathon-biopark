@@ -7,12 +7,10 @@ import {
   AreaChart, Area,
 } from 'recharts'
 import {
-  ArrowLeft, Download, CheckCircle2, AlertTriangle,
-  ChevronDown,
+  ArrowLeft, Download, CheckCircle2, ChevronDown, X,
 } from 'lucide-react'
 import { getDashboardData, downloadPdf } from '../services/api'
 
-/* Quiet Pro palette for charts */
 const STATUS_COLORS = {
   'EM ANDAMENTO': '#3454ff',
   PENDENTE:       '#ff8a2a',
@@ -28,20 +26,29 @@ const TIPO_MAP = {
   duracao_alta:    { label: 'Duração alta',    bg: 'bg-orange-50', fg: 'text-orange-700' },
 }
 
+const EMPTY_FILTERS = {
+  projeto: '', orgao: '', status: '', ativo: '',
+  atribuido_a: '', situacao: '', data_abertura_inicio: '', data_abertura_fim: '',
+}
+
 export default function Reports() {
   const navigate = useNavigate()
-  const [filters, setFilters] = useState({ projeto: '', orgao: '', status: '', ativo: '' })
+  const [filters, setFilters] = useState(EMPTY_FILTERS)
 
   const params = useMemo(() => {
     const p = {}
-    if (filters.projeto) p.projeto = filters.projeto
-    if (filters.orgao)   p.orgao   = filters.orgao
-    if (filters.status)  p.status  = filters.status
-    if (filters.ativo !== '') p.ativo = filters.ativo === 'true'
+    if (filters.projeto)               p.projeto               = filters.projeto
+    if (filters.orgao)                 p.orgao                 = filters.orgao
+    if (filters.status)                p.status                = filters.status
+    if (filters.ativo !== '')          p.ativo                 = filters.ativo === 'true'
+    if (filters.atribuido_a)           p.atribuido_a           = filters.atribuido_a
+    if (filters.situacao)              p.situacao              = filters.situacao
+    if (filters.data_abertura_inicio)  p.data_abertura_inicio  = filters.data_abertura_inicio
+    if (filters.data_abertura_fim)     p.data_abertura_fim     = filters.data_abertura_fim
     return p
   }, [filters])
 
-  const hasFilters = filters.projeto || filters.orgao || filters.status || filters.ativo !== ''
+  const hasFilters = Object.values(filters).some(v => v !== '')
 
   const { data, isLoading } = useQuery({
     queryKey: ['dashboard', params],
@@ -50,6 +57,10 @@ export default function Reports() {
 
   const kpis = data?.kpis ?? {}
   const totalConsultas = (data?.consultas_por_periodo ?? []).reduce((a, b) => a + (b.count ?? 0), 0)
+
+  function set(key) {
+    return v => setFilters(f => ({ ...f, [key]: v }))
+  }
 
   return (
     <div className="min-h-screen bg-paper text-ink">
@@ -71,10 +82,11 @@ export default function Reports() {
           </nav>
         </div>
         <button
-          onClick={downloadPdf}
+          onClick={() => downloadPdf(params)}
           className="px-3.5 py-2 rounded-lg text-sm font-semibold flex items-center gap-1.5 bg-ink text-lime hover:bg-ink-2 transition"
         >
           <Download size={13} /> Baixar PDF
+          {hasFilters && <span className="text-[10px] font-mono bg-lime/20 text-lime px-1.5 py-0.5 rounded">filtrado</span>}
         </button>
       </header>
 
@@ -91,14 +103,25 @@ export default function Reports() {
           </div>
         </div>
 
-        {/* ═══ Filter chips ═══ */}
-        <div className="rounded-2xl bg-surface border border-line p-4 mb-4">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-medium text-muted mr-1">Filtros:</span>
+        {/* ═══ Filter panel ═══ */}
+        <div className="rounded-2xl bg-surface border border-line p-4 mb-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-muted uppercase tracking-wider">Filtros</span>
+            {hasFilters && (
+              <button
+                onClick={() => setFilters(EMPTY_FILTERS)}
+                className="flex items-center gap-1 text-xs text-muted hover:text-ink font-medium transition"
+              >
+                <X size={11} /> Limpar tudo
+              </button>
+            )}
+          </div>
 
+          {/* Row 1 */}
+          <div className="flex items-center gap-2 flex-wrap">
             <FilterChip
               value={filters.status}
-              onChange={v => setFilters(f => ({ ...f, status: v }))}
+              onChange={set('status')}
               placeholder="Todos os status"
               options={[
                 ['EM ANDAMENTO', 'Em andamento'],
@@ -110,32 +133,69 @@ export default function Reports() {
             />
             <FilterChip
               value={filters.ativo}
-              onChange={v => setFilters(f => ({ ...f, ativo: v }))}
+              onChange={set('ativo')}
               placeholder="Ativo e inativo"
               options={[['true', 'Apenas ativos'], ['false', 'Apenas inativos']]}
             />
-            <input
+            <TextFilter
               value={filters.projeto}
-              onChange={e => setFilters(f => ({ ...f, projeto: e.target.value }))}
+              onChange={set('projeto')}
               placeholder="Projeto…"
-              className="text-sm border border-line-2 rounded-lg px-3 py-1.5 bg-paper text-ink placeholder:text-muted-faint outline-none focus:ring-2 focus:ring-ink/10 focus:border-ink/30 w-40"
+              width="w-40"
             />
-            <input
+            <TextFilter
               value={filters.orgao}
-              onChange={e => setFilters(f => ({ ...f, orgao: e.target.value }))}
+              onChange={set('orgao')}
               placeholder="Órgão…"
-              className="text-sm border border-line-2 rounded-lg px-3 py-1.5 bg-paper text-ink placeholder:text-muted-faint outline-none focus:ring-2 focus:ring-ink/10 focus:border-ink/30 w-44"
+              width="w-44"
             />
-
-            {hasFilters && (
-              <button
-                onClick={() => setFilters({ projeto: '', orgao: '', status: '', ativo: '' })}
-                className="text-xs text-muted hover:text-ink font-medium ml-auto"
-              >
-                Limpar filtros
-              </button>
-            )}
           </div>
+
+          {/* Row 2 */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <TextFilter
+              value={filters.atribuido_a}
+              onChange={set('atribuido_a')}
+              placeholder="Atribuído a…"
+              width="w-40"
+            />
+            <TextFilter
+              value={filters.situacao}
+              onChange={set('situacao')}
+              placeholder="Situação…"
+              width="w-44"
+            />
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-muted whitespace-nowrap">Abertura de</span>
+              <input
+                type="date"
+                value={filters.data_abertura_inicio}
+                onChange={e => set('data_abertura_inicio')(e.target.value)}
+                className="text-sm border border-line-2 rounded-lg px-3 py-1.5 bg-paper text-ink outline-none focus:ring-2 focus:ring-ink/10 focus:border-ink/30 transition"
+              />
+              <span className="text-xs text-muted">até</span>
+              <input
+                type="date"
+                value={filters.data_abertura_fim}
+                onChange={e => set('data_abertura_fim')(e.target.value)}
+                className="text-sm border border-line-2 rounded-lg px-3 py-1.5 bg-paper text-ink outline-none focus:ring-2 focus:ring-ink/10 focus:border-ink/30 transition"
+              />
+            </div>
+          </div>
+
+          {/* Active filter chips */}
+          {hasFilters && (
+            <div className="flex items-center gap-1.5 flex-wrap pt-1 border-t border-line-2">
+              {filters.status && <ActiveChip label={`Status: ${filters.status}`} onRemove={() => set('status')('')} />}
+              {filters.ativo !== '' && <ActiveChip label={filters.ativo === 'true' ? 'Apenas ativos' : 'Apenas inativos'} onRemove={() => set('ativo')('')} />}
+              {filters.projeto && <ActiveChip label={`Projeto: ${filters.projeto}`} onRemove={() => set('projeto')('')} />}
+              {filters.orgao && <ActiveChip label={`Órgão: ${filters.orgao}`} onRemove={() => set('orgao')('')} />}
+              {filters.atribuido_a && <ActiveChip label={`Atribuído: ${filters.atribuido_a}`} onRemove={() => set('atribuido_a')('')} />}
+              {filters.situacao && <ActiveChip label={`Situação: ${filters.situacao}`} onRemove={() => set('situacao')('')} />}
+              {filters.data_abertura_inicio && <ActiveChip label={`De: ${filters.data_abertura_inicio}`} onRemove={() => set('data_abertura_inicio')('')} />}
+              {filters.data_abertura_fim && <ActiveChip label={`Até: ${filters.data_abertura_fim}`} onRemove={() => set('data_abertura_fim')('')} />}
+            </div>
+          )}
         </div>
 
         {/* ═══ CONTENT ═══ */}
@@ -236,10 +296,10 @@ export default function Reports() {
               </Card>
             </div>
 
-            {/* ═══ Charts row 2 — Org volume + Críticos ═══ */}
+            {/* ═══ Charts row 2 — Org volume + Atribuído ═══ */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
 
-              <Card className="lg:col-span-7" title="Por órgão" subtitle="Top 8 entidades por volume">
+              <Card className="lg:col-span-7" title="Por órgão" subtitle="Top 8 por volume">
                 {!(data?.por_orgao?.length) ? <EmptyChart /> : (
                   <ResponsiveContainer width="100%" height={260}>
                     <BarChart
@@ -268,44 +328,73 @@ export default function Reports() {
                 )}
               </Card>
 
-              <Card
-                className="lg:col-span-5"
-                title="Protocolos críticos"
-                subtitle={`${(data?.protocolos_criticos ?? []).length} identificado(s)`}
-                right={(data?.protocolos_criticos ?? []).length > 0 && (
-                  <span className="pill bg-red-50 text-red-700">{data.protocolos_criticos.length}</span>
-                )}
-              >
-                {!(data?.protocolos_criticos?.length) ? (
-                  <div className="flex items-center gap-2 text-emerald-600 py-5 text-sm">
-                    <CheckCircle2 size={16} /> Nenhum protocolo crítico
-                  </div>
-                ) : (
-                  <div className="space-y-2 max-h-[230px] overflow-y-auto -mr-2 pr-2">
-                    {data.protocolos_criticos.slice(0, 8).map(p => {
-                      const t = TIPO_MAP[p.tipo] ?? { label: p.tipo, bg: 'bg-paper', fg: 'text-muted' }
-                      return (
-                        <div key={p.id} className="flex items-center justify-between gap-3 p-3 rounded-lg bg-paper hover:bg-line transition">
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-mono text-xs text-ink">{p.protocolo}</span>
-                              <span className={`pill ${t.bg} ${t.fg}`}>{t.label}</span>
-                            </div>
-                            <p className="text-xs text-muted mt-1 truncate">
-                              {p.projeto}{p.orgao ? ` · ${p.orgao}` : ''}
-                            </p>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <div className="text-base font-semibold num text-accent-red">{p.duracao_dias != null ? `${p.duracao_dias}d` : '—'}</div>
-                            <div className="text-[10px] font-mono uppercase text-muted">sem ação</div>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
+              <Card className="lg:col-span-5" title="Por responsável" subtitle="Top 8 por volume">
+                {!(data?.por_atribuido?.length) ? <EmptyChart /> : (
+                  <ResponsiveContainer width="100%" height={260}>
+                    <BarChart
+                      layout="vertical"
+                      data={data.por_atribuido}
+                      margin={{ top: 4, right: 16, left: 0, bottom: 0 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#eeede8" />
+                      <XAxis type="number" tick={{ fontSize: 10, fill: '#7c7c78' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                      <YAxis
+                        type="category"
+                        dataKey="atribuido_a"
+                        width={110}
+                        tick={{ fontSize: 11, fill: '#0a0a0a' }}
+                        axisLine={false} tickLine={false}
+                        tickFormatter={v => v.length > 16 ? v.slice(0, 16) + '…' : v}
+                      />
+                      <Tooltip
+                        cursor={{ fill: '#f7f7f5' }}
+                        contentStyle={{ background: '#0a0a0a', color: '#fff', border: 'none', borderRadius: 8, fontSize: 12 }}
+                        labelStyle={{ color: '#d4ff3a' }}
+                      />
+                      <Bar dataKey="count" fill="#3454ff" radius={[0, 6, 6, 0]} maxBarSize={20} />
+                    </BarChart>
+                  </ResponsiveContainer>
                 )}
               </Card>
             </div>
+
+            {/* ═══ Charts row 3 — Críticos ═══ */}
+            <Card
+              title="Protocolos críticos"
+              subtitle={`${(data?.protocolos_criticos ?? []).length} identificado(s)`}
+              right={(data?.protocolos_criticos ?? []).length > 0 && (
+                <span className="pill bg-red-50 text-red-700">{data.protocolos_criticos.length}</span>
+              )}
+            >
+              {!(data?.protocolos_criticos?.length) ? (
+                <div className="flex items-center gap-2 text-emerald-600 py-5 text-sm">
+                  <CheckCircle2 size={16} /> Nenhum protocolo crítico
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2 max-h-[300px] overflow-y-auto -mr-2 pr-2">
+                  {data.protocolos_criticos.slice(0, 12).map(p => {
+                    const t = TIPO_MAP[p.tipo] ?? { label: p.tipo, bg: 'bg-paper', fg: 'text-muted' }
+                    return (
+                      <div key={p.id} className="flex items-center justify-between gap-3 p-3 rounded-lg bg-paper hover:bg-line transition">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-mono text-xs text-ink">{p.protocolo}</span>
+                            <span className={`pill ${t.bg} ${t.fg}`}>{t.label}</span>
+                          </div>
+                          <p className="text-xs text-muted mt-1 truncate">
+                            {p.projeto}{p.orgao ? ` · ${p.orgao}` : ''}
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <div className="text-base font-semibold num text-accent-red">{p.duracao_dias != null ? `${p.duracao_dias}d` : '—'}</div>
+                          <div className="text-[10px] font-mono uppercase text-muted">sem ação</div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </Card>
 
             {/* ═══ Alertas — timeline ═══ */}
             <Card title="Alertas recentes" subtitle={`${(data?.alertas_recentes ?? []).length} alerta(s)`}>
@@ -408,6 +497,35 @@ function FilterChip({ value, onChange, placeholder, options }) {
       </select>
       <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
     </div>
+  )
+}
+
+function TextFilter({ value, onChange, placeholder, width = 'w-40' }) {
+  return (
+    <div className="relative">
+      <input
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        className={`text-sm border border-line-2 rounded-lg px-3 py-1.5 bg-paper text-ink placeholder:text-muted-faint outline-none focus:ring-2 focus:ring-ink/10 focus:border-ink/30 transition ${width}`}
+      />
+      {value && (
+        <button onClick={() => onChange('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-ink transition">
+          <X size={11} />
+        </button>
+      )}
+    </div>
+  )
+}
+
+function ActiveChip({ label, onRemove }) {
+  return (
+    <span className="inline-flex items-center gap-1 text-xs bg-ink text-lime font-medium px-2 py-0.5 rounded-full">
+      {label}
+      <button onClick={onRemove} className="hover:opacity-70 transition ml-0.5">
+        <X size={10} />
+      </button>
+    </span>
   )
 }
 

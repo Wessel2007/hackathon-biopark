@@ -243,11 +243,6 @@ export default function Dashboard() {
           </nav>
         </div>
         <div className="flex items-center gap-2">
-          <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs w-64 bg-paper text-muted">
-            <Search size={12} />
-            <span className="flex-1 truncate">Buscar protocolo, projeto, órgão…</span>
-            <span className="font-mono text-[10px] px-1.5 py-0.5 rounded border border-line-2 text-muted">⌘K</span>
-          </div>
           <button className="relative w-9 h-9 rounded-lg flex items-center justify-center bg-paper hover:bg-line transition">
             <Bell size={14} className="text-ink" />
             {mudancasHoje > 0 && (
@@ -263,7 +258,7 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <div className="px-6 py-6 max-w-[1400px] mx-auto">
+      <div className="px-6 py-6 max-w-[1700px] mx-auto">
 
         {/* ═══ Title row ═══ */}
         <div className="flex items-end justify-between mb-6 gap-4 flex-wrap">
@@ -454,7 +449,7 @@ export default function Dashboard() {
           </div>
         ) : (
           <div className="bg-surface rounded-2xl border border-line overflow-hidden">
-            <div className="overflow-x-auto">
+            <div>
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-paper border-b border-line">
@@ -477,14 +472,14 @@ export default function Dashboard() {
                           <span className="w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-semibold bg-paper text-ink shrink-0">
                             {(p.projeto || '?').split(' ').filter(Boolean).map(w=>w[0]).join('').slice(0,2).toUpperCase()}
                           </span>
-                          <span className="font-medium max-w-[160px] truncate">{p.projeto}</span>
+                          <span className="font-medium max-w-[220px] truncate">{p.projeto}</span>
                         </div>
                       </td>
                       <td className="px-4 py-3.5 font-mono text-xs text-muted whitespace-nowrap">{p.protocolo}</td>
-                      <td className="px-4 py-3.5 text-ink-2 max-w-[180px] truncate">{p.atividade}</td>
-                      <td className="px-4 py-3.5 text-muted max-w-[140px] truncate">{p.orgao_site_consultado}</td>
+                      <td className="px-4 py-3.5 text-ink-2 max-w-[240px] truncate">{p.atividade}</td>
+                      <td className="px-4 py-3.5 text-muted max-w-[180px] truncate">{p.orgao_site_consultado}</td>
                       <td className="px-4 py-3.5"><StatusChip status={p.status} /></td>
-                      <td className="px-4 py-3.5 text-xs text-muted max-w-[140px] truncate">{p.situacao ?? <span className="text-muted-faint">—</span>}</td>
+                      <td className="px-4 py-3.5 text-xs text-muted max-w-[180px] truncate">{p.situacao ?? <span className="text-muted-faint">—</span>}</td>
                       <td className="px-4 py-3.5">
                         {(mudancaMap[p.id] || p.houve_mudanca) ? (
                           <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-lime-deep">
