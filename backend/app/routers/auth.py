@@ -1,13 +1,12 @@
 from datetime import datetime, timedelta
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from jose import jwt
-from passlib.context import CryptContext
 
 from app.config import settings
-from app.schemas.auth import LoginRequest, TokenResponse
+from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse
+from app.supabase_client import SupabaseClient, get_supabase
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def create_access_token(data: dict) -> str:
@@ -17,8 +16,18 @@ def create_access_token(data: dict) -> str:
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(body: LoginRequest):
-    if body.email != settings.dashboard_email or body.password != settings.dashboard_password:
+def login(body: LoginRequest, sb: SupabaseClient = Depends(get_supabase)):
+    result = sb.table("usuarios").select("email, senha_hash").eq("email", body.email).maybe_single().execute()
+    if not result.data or result.data["senha_hash"] != body.password:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciais inválidas")
     token = create_access_token({"sub": body.email})
     return TokenResponse(access_token=token)
+
+
+@router.post("/register", status_code=201)
+def register(body: RegisterRequest, sb: SupabaseClient = Depends(get_supabase)):
+    existing = sb.table("usuarios").select("id").eq("email", body.email).maybe_single().execute()
+    if existing.data:
+        raise HTTPException(status_code=409, detail="E-mail já cadastrado")
+    sb.table("usuarios").insert({"email": body.email, "senha_hash": body.password}).execute()
+    return {"message": "Usuário criado com sucesso"}
