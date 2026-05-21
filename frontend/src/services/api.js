@@ -23,6 +23,17 @@ api.interceptors.response.use(
 
 export default api
 
+export function getCargoFromToken() {
+  const token = localStorage.getItem('token')
+  if (!token) return null
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    return payload.cargo || null
+  } catch {
+    return null
+  }
+}
+
 // Auth
 export const login = (email, password) =>
   api.post('/auth/login', { email, password }).then((r) => r.data)

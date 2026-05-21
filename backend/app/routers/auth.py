@@ -17,10 +17,10 @@ def create_access_token(data: dict) -> str:
 
 @router.post("/login", response_model=TokenResponse)
 def login(body: LoginRequest, sb: SupabaseClient = Depends(get_supabase)):
-    result = sb.table("usuarios").select("email, senha_hash").eq("email", body.email).maybe_single().execute()
+    result = sb.table("usuarios").select("email, senha_hash, cargo").eq("email", body.email).maybe_single().execute()
     if not result.data or result.data["senha_hash"] != body.password:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciais inválidas")
-    token = create_access_token({"sub": body.email})
+    token = create_access_token({"sub": body.email, "cargo": result.data.get("cargo", "usuario")})
     return TokenResponse(access_token=token)
 
 
