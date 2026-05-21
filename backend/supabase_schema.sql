@@ -32,7 +32,11 @@ CREATE TABLE query_history (
     texto_bruto  TEXT,
     houve_mudanca BOOLEAN NOT NULL DEFAULT FALSE,
     erro         TEXT,
-    data_consulta TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    data_consulta TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    data_movimentacao TEXT,
+    mudancas_detectadas TEXT,
+    fonte_consulta TEXT,
+    status_anterior TEXT
 );
 
 CREATE INDEX idx_protocols_projeto   ON protocols(projeto);

@@ -55,6 +55,8 @@ class QueryHistoryOut(BaseModel):
     data_consulta: datetime
     data_movimentacao: Optional[str] = None
     mudancas_detectadas: Optional[List[str]] = None
+    fonte_consulta: Optional[str] = None
+    status_anterior: Optional[str] = None
 
     @field_validator("mudancas_detectadas", mode="before")
     @classmethod

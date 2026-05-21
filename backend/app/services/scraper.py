@@ -2,6 +2,11 @@ from datetime import datetime, timezone, timedelta
 import random
 import re
 import json
+import time
+from html import unescape
+
+import httpx
+from bs4 import BeautifulSoup
 
 from app.supabase_client import SupabaseClient
 from app.services.email_service import enviar_alerta
@@ -61,7 +66,7 @@ def _mock_query(p: dict) -> dict:
             "observacao":         None,
             "texto_bruto":        None,
             "data_movimentacao":  None,
-            "fonte_consulta":     orgao or None,
+            "fonte_consulta":     f"SIMULADO: {orgao}" if orgao else "SIMULADO",
             "erro": "Protocolo ou órgão não informado — consulta não realizada.",
         }
 
@@ -78,7 +83,7 @@ def _mock_query(p: dict) -> dict:
                 "observacao":  f"Protocolo {protocolo} não localizado no sistema de {orgao}.",
                 "texto_bruto": None,
                 "data_movimentacao": data_mov,
-                "fonte_consulta": orgao,
+                "fonte_consulta": f"SIMULADO: {orgao}",
                 "erro": None,
             }
         obs = f"Protocolo {protocolo} localizado no sistema de {orgao}. Consulta realizada com sucesso."
@@ -93,9 +98,15 @@ def _mock_query(p: dict) -> dict:
         "observacao":          obs,
         "texto_bruto":         None,
         "data_movimentacao":   data_mov,
-        "fonte_consulta":      orgao,
+        "fonte_consulta":      f"SIMULADO: {orgao}",
         "erro":                None,
     }
+
+
+def _query_source(p: dict) -> dict:
+    if _is_cartorios_pr_query(p):
+        return _query_cartorios_pr_toledo(p)
+    return _mock_query(p)
 
 
 # ---------------------------------------------------------------------------
@@ -164,7 +175,7 @@ def run_single_query(protocol_id: int, sb: SupabaseClient, user_email: str = "")
     if not p:
         return {"erro": "Protocolo não encontrado"}
 
-    resultado = _mock_query(p)
+    resultado = _query_source(p)
 
     historico = sorted(
         p.get("query_history") or [],
