@@ -4,6 +4,7 @@ import re
 import json
 
 from app.supabase_client import SupabaseClient
+from app.services.email_service import enviar_alerta
 
 
 # ---------------------------------------------------------------------------
@@ -151,7 +152,7 @@ def _build_mudancas(ultimo: dict | None, resultado: dict, protocolo_num: str) ->
 # Main entry points
 # ---------------------------------------------------------------------------
 
-def run_single_query(protocol_id: int, sb: SupabaseClient) -> dict:
+def run_single_query(protocol_id: int, sb: SupabaseClient, user_email: str = "") -> dict:
     result = (
         sb.table("protocols")
         .select("*, query_history(*)")
@@ -177,6 +178,9 @@ def run_single_query(protocol_id: int, sb: SupabaseClient) -> dict:
 
     status_anterior = (ultimo.get("status_consultado") if ultimo else None) or p.get("status")
     status_novo     = resultado.get("status_consultado")
+
+    if houve_mudanca:
+        enviar_alerta(p, mudancas, user_email)
 
     now = datetime.now(timezone.utc).isoformat()
 
@@ -217,7 +221,7 @@ def run_single_query(protocol_id: int, sb: SupabaseClient) -> dict:
     }
 
 
-def run_all_queries(sb: SupabaseClient) -> None:
+def run_all_queries(sb: SupabaseClient, user_email: str = "") -> None:
     protocols = sb.table("protocols").select("id").eq("ativo", True).execute().data
     for p in (protocols or []):
-        run_single_query(p["id"], sb)
+        run_single_query(p["id"], sb, user_email)

@@ -12,9 +12,9 @@ router = APIRouter(prefix="/scraping", tags=["scraping"])
 def run_all(
     background_tasks: BackgroundTasks,
     sb: Client = Depends(get_supabase),
-    _: str = Depends(get_current_user),
+    current_user: str = Depends(get_current_user),
 ):
-    background_tasks.add_task(run_all_queries, sb)
+    background_tasks.add_task(run_all_queries, sb, current_user)
     return {"message": "Consulta iniciada em background"}
 
 
@@ -22,6 +22,6 @@ def run_all(
 def run_one(
     protocol_id: int,
     sb: Client = Depends(get_supabase),
-    _: str = Depends(get_current_user),
+    current_user: str = Depends(get_current_user),
 ):
-    return run_single_query(protocol_id, sb)
+    return run_single_query(protocol_id, sb, current_user)

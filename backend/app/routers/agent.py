@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from app.config import settings
 from app.routers.deps import get_current_user
+from app.services.email_service import enviar_alerta
 from app.supabase_client import SupabaseClient, get_supabase
 
 router = APIRouter(prefix="/agent", tags=["agent"])
@@ -153,20 +154,19 @@ def _resumo_dashboard(sb: SupabaseClient):
     return {"total": total, "ativos": ativos, "inativos": total - ativos, "por_status": por_status}
 
 
-def _criar_protocolo(sb: SupabaseClient, **kwargs):
-    from datetime import date
+def _criar_protocolo(sb: SupabaseClient, user_email: str = "", **kwargs):
     payload = {
-        "status":               kwargs.get("status", "PENDENTE"),
-        "projeto":              kwargs["projeto"],
-        "protocolo":            kwargs["protocolo"],
-        "atividade":            kwargs["atividade"],
+        "status":                kwargs.get("status", "PENDENTE"),
+        "projeto":               kwargs["projeto"],
+        "protocolo":             kwargs["protocolo"],
+        "atividade":             kwargs["atividade"],
         "orgao_site_consultado": kwargs["orgao_site_consultado"],
-        "data_abertura":        kwargs["data_abertura"],
-        "atribuido_a":          kwargs.get("atribuido_a"),
-        "situacao":             kwargs.get("situacao"),
-        "url_consulta":         kwargs.get("url_consulta"),
-        "data_finalizacao":     kwargs.get("data_finalizacao"),
-        "ativo":                True,
+        "data_abertura":         kwargs["data_abertura"],
+        "atribuido_a":           kwargs.get("atribuido_a"),
+        "situacao":              kwargs.get("situacao"),
+        "url_consulta":          kwargs.get("url_consulta"),
+        "data_finalizacao":      kwargs.get("data_finalizacao"),
+        "ativo":                 True,
     }
     existing = sb.table("protocols").select("id").eq("projeto", payload["projeto"]).eq("protocolo", payload["protocolo"]).execute()
     if existing.data:
@@ -174,18 +174,25 @@ def _criar_protocolo(sb: SupabaseClient, **kwargs):
     result = sb.table("protocols").insert(payload).execute()
     if not result.data:
         return {"error": "Erro ao criar protocolo no banco de dados."}
-    return {"sucesso": True, "protocolo": result.data[0]}
+    protocolo_criado = result.data[0]
+    enviar_alerta(
+        protocolo_criado,
+        [f"Protocolo {protocolo_criado['protocolo']} do projeto {protocolo_criado['projeto']} foi criado com status {protocolo_criado['status']}."],
+        user_email,
+    )
+    return {"sucesso": True, "protocolo": protocolo_criado}
 
 
-def _atualizar_protocolo(sb: SupabaseClient, numero: str, **kwargs):
-    existing = sb.table("protocols").select("id,projeto,protocolo,status").ilike("protocolo", numero).execute()
+def _atualizar_protocolo(sb: SupabaseClient, numero: str, user_email: str = "", **kwargs):
+    existing = sb.table("protocols").select("id,projeto,protocolo,status,orgao_site_consultado,atribuido_a").ilike("protocolo", numero).execute()
     if not existing.data:
         return {"error": f"Nenhum protocolo encontrado com o número '{numero}'."}
     if len(existing.data) > 1:
         nomes = [f"ID {p['id']} — {p['projeto']}" for p in existing.data]
         return {"error": f"Mais de um protocolo encontrado com esse número. Especifique o projeto: {', '.join(nomes)}"}
 
-    protocol_id = existing.data[0]["id"]
+    antes = existing.data[0]
+    protocol_id = antes["id"]
     campos_permitidos = ["status", "situacao", "atribuido_a", "data_finalizacao", "ativo",
                          "projeto", "atividade", "orgao_site_consultado", "url_consulta"]
     payload = {k: v for k, v in kwargs.items() if k in campos_permitidos and v is not None}
@@ -196,10 +203,22 @@ def _atualizar_protocolo(sb: SupabaseClient, numero: str, **kwargs):
     result = sb.table("protocols").update(payload).eq("id", protocol_id).execute()
     if not result.data:
         return {"error": "Erro ao atualizar protocolo."}
-    return {"sucesso": True, "protocolo": result.data[0]}
+
+    depois = result.data[0]
+    mudancas = []
+    for campo, label in [("status", "Status"), ("situacao", "Situação"), ("atribuido_a", "Responsável")]:
+        v_antes = antes.get(campo)
+        v_depois = depois.get(campo)
+        if v_antes != v_depois and v_depois is not None:
+            mudancas.append(f"{label} alterado de '{v_antes or '—'}' para '{v_depois}'.")
+    if not mudancas:
+        mudancas = [f"Protocolo {depois['protocolo']} atualizado via assistente."]
+
+    enviar_alerta(depois, mudancas, user_email)
+    return {"sucesso": True, "protocolo": depois}
 
 
-def _run_tool(name: str, args: dict, sb: SupabaseClient):
+def _run_tool(name: str, args: dict, sb: SupabaseClient, user_email: str = ""):
     if name == "buscar_protocolos":
         return _buscar_protocolos(sb, **args)
     if name == "buscar_protocolo_por_numero":
@@ -207,9 +226,9 @@ def _run_tool(name: str, args: dict, sb: SupabaseClient):
     if name == "resumo_dashboard":
         return _resumo_dashboard(sb)
     if name == "criar_protocolo":
-        return _criar_protocolo(sb, **args)
+        return _criar_protocolo(sb, user_email=user_email, **args)
     if name == "atualizar_protocolo":
-        return _atualizar_protocolo(sb, **args)
+        return _atualizar_protocolo(sb, user_email=user_email, **args)
     return {"error": "Ferramenta desconhecida"}
 
 
@@ -226,7 +245,7 @@ class ChatRequest(BaseModel):
 def chat(
     body: ChatRequest,
     sb: SupabaseClient = Depends(get_supabase),
-    _: str = Depends(get_current_user),
+    current_user: str = Depends(get_current_user),
 ):
     client = OpenAI(api_key=settings.openai_api_key)
 
@@ -245,7 +264,7 @@ def chat(
     if msg.tool_calls:
         messages.append(msg)
         for tc in msg.tool_calls:
-            result = _run_tool(tc.function.name, json.loads(tc.function.arguments), sb)
+            result = _run_tool(tc.function.name, json.loads(tc.function.arguments), sb, current_user)
             messages.append({
                 "role": "tool",
                 "tool_call_id": tc.id,
