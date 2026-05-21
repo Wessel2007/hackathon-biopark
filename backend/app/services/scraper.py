@@ -2,8 +2,141 @@ from datetime import datetime, timezone, timedelta
 import random
 import re
 import json
+import time
+from html import unescape
+
+import httpx
+from bs4 import BeautifulSoup
 
 from app.supabase_client import SupabaseClient
+
+
+# ---------------------------------------------------------------------------
+# Real source: e-Andamento Cartorios PR (Toledo - 1o Oficio)
+# ---------------------------------------------------------------------------
+
+_CARTORIOS_PR_URL = "https://www.cartoriospr.com.br/eandamento/index.php?modulo=resultado&token="
+_TOLEDO_1_OFICIO = {
+    "serventia": "193",
+    "cns": "88401",
+    "pedido_balcao": "S",
+    "download_direto": "S",
+    "tipo": "1",  # Protocolo de Registro/Averbacoes
+}
+
+
+def _only_digits(value: str | None) -> str:
+    return re.sub(r"\D", "", value or "")
+
+
+def _is_cartorios_pr_query(p: dict) -> bool:
+    orgao = (p.get("orgao_site_consultado") or "").lower()
+    url = (p.get("url_consulta") or "").lower()
+    return (
+        "cartoriospr.com.br" in url
+        or "toledo" in orgao
+    )
+
+
+def _label_value(text: str, label: str) -> str | None:
+    pattern = rf"{re.escape(label)}:\s*(.*?)(?=\s*(?:Data Movimentação|Setor|Posição de serviço):|$)"
+    match = re.search(pattern, text, flags=re.IGNORECASE | re.DOTALL)
+    if not match:
+        return None
+    return " ".join(match.group(1).split()) or None
+
+
+def _parse_cartorios_pr_result(html: str, protocolo: str) -> dict:
+    soup = BeautifulSoup(html, "html.parser")
+    page_text = " ".join(soup.get_text(" ", strip=True).split())
+
+    if "O número digitado não foi encontrado" in page_text:
+        return {
+            "status_consultado": None,
+            "situacao_consultada": "NAO_ENCONTRADO",
+            "observacao": f"Protocolo {protocolo} nao localizado no e-Andamento do Cartorios PR.",
+            "texto_bruto": None,
+            "data_movimentacao": None,
+            "fonte_consulta": "REAL: Cartorios PR e-Andamento - Toledo 1o Oficio",
+            "erro": None,
+        }
+
+    movements: list[dict[str, str | None]] = []
+    for item in soup.select("ul.list-group li.list-group-item"):
+        text = " ".join(item.get_text(" ", strip=True).split())
+        movement = {
+            "data_movimentacao": _label_value(text, "Data Movimentação"),
+            "setor": _label_value(text, "Setor"),
+            "posicao_servico": _label_value(text, "Posição de serviço"),
+        }
+        if movement["data_movimentacao"] or movement["posicao_servico"]:
+            movements.append(movement)
+
+    if not movements:
+        return {
+            "status_consultado": None,
+            "situacao_consultada": None,
+            "observacao": "Consulta concluida, mas o andamento do servico nao foi encontrado no HTML retornado.",
+            "texto_bruto": page_text[:4000],
+            "data_movimentacao": None,
+            "fonte_consulta": "REAL: Cartorios PR e-Andamento - Toledo 1o Oficio",
+            "erro": "Nao foi possivel identificar a ultima movimentacao no retorno do Cartorios PR.",
+        }
+
+    latest = movements[-1]
+    posicao = latest.get("posicao_servico") or "CONSULTADO"
+    setor = latest.get("setor")
+    data_mov = latest.get("data_movimentacao")
+
+    return {
+        "status_consultado": posicao.upper(),
+        "situacao_consultada": None,
+        "observacao": f"Ultima movimentacao: {data_mov} | Setor: {setor or '-'} | Posicao de servico: {posicao}",
+        "texto_bruto": json.dumps(
+            {"fonte": "cartoriospr_eandamento", "movimentacoes": movements},
+            ensure_ascii=False,
+        ),
+        "data_movimentacao": data_mov,
+        "fonte_consulta": "REAL: Cartorios PR e-Andamento - Toledo 1o Oficio",
+        "erro": None,
+    }
+
+
+def _query_cartorios_pr_toledo(p: dict) -> dict:
+    protocolo = _only_digits(p.get("protocolo"))
+    if not protocolo:
+        return {
+            "status_consultado": None,
+            "situacao_consultada": None,
+            "observacao": None,
+            "texto_bruto": None,
+            "data_movimentacao": None,
+            "fonte_consulta": "REAL: Cartorios PR e-Andamento - Toledo 1o Oficio",
+            "erro": "Protocolo vazio ou invalido para consulta no Cartorios PR.",
+        }
+
+    payload = {**_TOLEDO_1_OFICIO, "protocolo": protocolo, "chave_edownload": ""}
+    headers = {
+        "User-Agent": "Mozilla/5.0 (compatible; HackathonBiopark/1.0; consulta-protocolos)",
+        "Referer": "https://www.cartoriospr.com.br/eandamento/index.php?token=",
+    }
+
+    try:
+        with httpx.Client(timeout=15.0, follow_redirects=True, headers=headers) as client:
+            response = client.post(_CARTORIOS_PR_URL, data=payload)
+            response.raise_for_status()
+    except httpx.HTTPError as exc:
+        return {
+            "status_consultado": None,
+            "situacao_consultada": None,
+            "observacao": None,
+            "texto_bruto": None,
+            "data_movimentacao": None,
+            "fonte_consulta": "REAL: Cartorios PR e-Andamento - Toledo 1o Oficio",
+            "erro": f"Falha ao consultar Cartorios PR: {exc}",
+        }
+
+    return _parse_cartorios_pr_result(unescape(response.text), protocolo)
 
 
 # ---------------------------------------------------------------------------
@@ -60,7 +193,7 @@ def _mock_query(p: dict) -> dict:
             "observacao":         None,
             "texto_bruto":        None,
             "data_movimentacao":  None,
-            "fonte_consulta":     orgao or None,
+            "fonte_consulta":     f"SIMULADO: {orgao}" if orgao else "SIMULADO",
             "erro": "Protocolo ou órgão não informado — consulta não realizada.",
         }
 
@@ -77,7 +210,7 @@ def _mock_query(p: dict) -> dict:
                 "observacao":  f"Protocolo {protocolo} não localizado no sistema de {orgao}.",
                 "texto_bruto": None,
                 "data_movimentacao": data_mov,
-                "fonte_consulta": orgao,
+                "fonte_consulta": f"SIMULADO: {orgao}",
                 "erro": None,
             }
         obs = f"Protocolo {protocolo} localizado no sistema de {orgao}. Consulta realizada com sucesso."
@@ -92,9 +225,15 @@ def _mock_query(p: dict) -> dict:
         "observacao":          obs,
         "texto_bruto":         None,
         "data_movimentacao":   data_mov,
-        "fonte_consulta":      orgao,
+        "fonte_consulta":      f"SIMULADO: {orgao}",
         "erro":                None,
     }
+
+
+def _query_source(p: dict) -> dict:
+    if _is_cartorios_pr_query(p):
+        return _query_cartorios_pr_toledo(p)
+    return _mock_query(p)
 
 
 # ---------------------------------------------------------------------------
@@ -163,7 +302,7 @@ def run_single_query(protocol_id: int, sb: SupabaseClient) -> dict:
     if not p:
         return {"erro": "Protocolo não encontrado"}
 
-    resultado = _mock_query(p)
+    resultado = _query_source(p)
 
     historico = sorted(
         p.get("query_history") or [],
@@ -221,3 +360,4 @@ def run_all_queries(sb: SupabaseClient) -> None:
     protocols = sb.table("protocols").select("id").eq("ativo", True).execute().data
     for p in (protocols or []):
         run_single_query(p["id"], sb)
+        time.sleep(1)

@@ -43,5 +43,7 @@ class QueryHistory(Base):
     data_consulta = Column(DateTime, default=datetime.utcnow, nullable=False)
     data_movimentacao = Column(String(20))
     mudancas_detectadas = Column(Text)
+    fonte_consulta = Column(Text)
+    status_anterior = Column(Text)
 
     protocol = relationship("Protocol", back_populates="historico")

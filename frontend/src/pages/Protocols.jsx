@@ -545,6 +545,24 @@ export default function Protocols() {
                 </p>
               )}
 
+              {queryResult.resultado?.data_movimentacao && (
+                <p className="text-xs text-gray-400 mt-1">
+                  Ultima movimentacao: <span className="font-medium text-gray-600">{queryResult.resultado.data_movimentacao}</span>
+                </p>
+              )}
+
+              {queryResult.resultado?.observacao && (
+                <div className="mt-3 bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm text-gray-600">
+                  {queryResult.resultado.observacao}
+                </div>
+              )}
+
+              {queryResult.resultado?.fonte_consulta && (
+                <p className="text-[11px] text-gray-400 mt-3">
+                  Fonte: <span className="font-medium">{queryResult.resultado.fonte_consulta}</span>
+                </p>
+              )}
+
               <button onClick={() => setQueryResult(null)} className="mt-4 w-full py-2 bg-brand-700 hover:bg-brand-800 text-white rounded-lg text-sm font-medium transition">OK</button>
             </div>
           </div>
