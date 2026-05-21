@@ -35,10 +35,11 @@ export default function AgentChat() {
         messages: next.filter(m => m.role !== 'system'),
       })
       setMessages(prev => [...prev, { role: 'assistant', content: data.reply }])
-    } catch {
+    } catch (err) {
+      const detail = err?.response?.data?.detail || err?.message || 'Erro desconhecido'
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: 'Desculpe, ocorreu um erro ao processar sua mensagem. Tente novamente.',
+        content: `Ocorreu um erro ao processar sua mensagem: ${detail}. Tente novamente.`,
       }])
     } finally {
       setLoading(false)

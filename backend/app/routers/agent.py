@@ -36,18 +36,85 @@ TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "buscar_protocolo_por_numero",
+            "description": "Busca um protocolo específico pelo número do protocolo (ex: 2025/001). Use antes de atualizar para confirmar que o protocolo existe.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "numero": {"type": "string", "description": "Número do protocolo (campo 'protocolo'), ex: 2025/001"},
+                },
+                "required": ["numero"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "resumo_dashboard",
             "description": "Retorna estatísticas gerais: total de protocolos, quantos ativos, distribuição por status. Use para perguntas de visão geral.",
             "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "criar_protocolo",
+            "description": "Cria um novo protocolo na plataforma. Use quando o usuário pedir para cadastrar ou criar um protocolo.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "projeto":               {"type": "string", "description": "Nome do projeto"},
+                    "protocolo":             {"type": "string", "description": "Número ou código do protocolo"},
+                    "atividade":             {"type": "string", "description": "Descrição da atividade"},
+                    "orgao_site_consultado": {"type": "string", "description": "Órgão ou site a ser consultado"},
+                    "status": {
+                        "type": "string",
+                        "enum": ["EM ANDAMENTO", "PENDENTE", "APROVADO", "CANCELADO", "REPROVADO"],
+                        "description": "Status inicial do protocolo (padrão: PENDENTE)",
+                    },
+                    "data_abertura":    {"type": "string", "description": "Data de abertura no formato YYYY-MM-DD"},
+                    "atribuido_a":      {"type": "string", "description": "Nome do responsável pelo protocolo"},
+                    "situacao":         {"type": "string", "description": "Descrição da situação atual"},
+                    "url_consulta":     {"type": "string", "description": "URL para consulta do protocolo"},
+                    "data_finalizacao": {"type": "string", "description": "Data de finalização no formato YYYY-MM-DD (opcional)"},
+                },
+                "required": ["projeto", "protocolo", "atividade", "orgao_site_consultado", "data_abertura"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "atualizar_protocolo",
+            "description": "Atualiza campos de um protocolo existente pelo número do protocolo. Use quando o usuário pedir para mudar status, situação, responsável ou qualquer outro campo.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "numero": {"type": "string", "description": "Número do protocolo a ser atualizado (campo 'protocolo'), ex: 2025/001"},
+                    "status": {
+                        "type": "string",
+                        "enum": ["EM ANDAMENTO", "PENDENTE", "APROVADO", "CANCELADO", "REPROVADO"],
+                        "description": "Novo status do protocolo",
+                    },
+                    "situacao":         {"type": "string", "description": "Nova descrição da situação"},
+                    "atribuido_a":      {"type": "string", "description": "Novo responsável"},
+                    "data_finalizacao": {"type": "string", "description": "Data de finalização no formato YYYY-MM-DD"},
+                    "ativo":            {"type": "boolean", "description": "true = ativo, false = inativo"},
+                },
+                "required": ["numero"],
+            },
         },
     },
 ]
 
 SYSTEM_PROMPT = (
     "Você é um assistente especializado na plataforma Biopark de gestão de protocolos públicos. "
-    "Ajude o usuário a entender o status dos protocolos, encontrar informações e tomar decisões. "
+    "Você pode consultar, criar e atualizar protocolos usando as ferramentas disponíveis. "
     "Responda sempre em português brasileiro de forma clara, direta e objetiva. "
-    "Quando precisar de dados reais, use as ferramentas disponíveis antes de responder. "
+    "Quando precisar de dados reais, use as ferramentas antes de responder. "
+    "Para ações de escrita (criar/atualizar): confirme os dados com o usuário ANTES de executar, "
+    "a menos que ele já tenha fornecido todos os detalhes claramente. "
+    "Após criar ou atualizar, informe o resultado com os dados do registro. "
     "Nunca invente dados — se não encontrar, diga que não há registros."
 )
 
@@ -66,6 +133,15 @@ def _buscar_protocolos(sb: SupabaseClient, projeto=None, status=None, ativo=None
     return q.limit(limit).order("projeto").execute().data
 
 
+def _buscar_protocolo_por_numero(sb: SupabaseClient, numero: str):
+    result = sb.table("protocols").select(
+        "id,projeto,protocolo,atividade,status,situacao,orgao_site_consultado,atribuido_a,data_abertura,data_finalizacao,ativo"
+    ).ilike("protocolo", numero).execute()
+    if not result.data:
+        return {"error": f"Nenhum protocolo encontrado com o número '{numero}'"}
+    return result.data
+
+
 def _resumo_dashboard(sb: SupabaseClient):
     protocols = sb.table("protocols").select("status,ativo").execute().data
     total = len(protocols)
@@ -77,11 +153,63 @@ def _resumo_dashboard(sb: SupabaseClient):
     return {"total": total, "ativos": ativos, "inativos": total - ativos, "por_status": por_status}
 
 
+def _criar_protocolo(sb: SupabaseClient, **kwargs):
+    from datetime import date
+    payload = {
+        "status":               kwargs.get("status", "PENDENTE"),
+        "projeto":              kwargs["projeto"],
+        "protocolo":            kwargs["protocolo"],
+        "atividade":            kwargs["atividade"],
+        "orgao_site_consultado": kwargs["orgao_site_consultado"],
+        "data_abertura":        kwargs["data_abertura"],
+        "atribuido_a":          kwargs.get("atribuido_a"),
+        "situacao":             kwargs.get("situacao"),
+        "url_consulta":         kwargs.get("url_consulta"),
+        "data_finalizacao":     kwargs.get("data_finalizacao"),
+        "ativo":                True,
+    }
+    existing = sb.table("protocols").select("id").eq("projeto", payload["projeto"]).eq("protocolo", payload["protocolo"]).execute()
+    if existing.data:
+        return {"error": "Já existe um protocolo com esse número para este projeto."}
+    result = sb.table("protocols").insert(payload).execute()
+    if not result.data:
+        return {"error": "Erro ao criar protocolo no banco de dados."}
+    return {"sucesso": True, "protocolo": result.data[0]}
+
+
+def _atualizar_protocolo(sb: SupabaseClient, numero: str, **kwargs):
+    existing = sb.table("protocols").select("id,projeto,protocolo,status").ilike("protocolo", numero).execute()
+    if not existing.data:
+        return {"error": f"Nenhum protocolo encontrado com o número '{numero}'."}
+    if len(existing.data) > 1:
+        nomes = [f"ID {p['id']} — {p['projeto']}" for p in existing.data]
+        return {"error": f"Mais de um protocolo encontrado com esse número. Especifique o projeto: {', '.join(nomes)}"}
+
+    protocol_id = existing.data[0]["id"]
+    campos_permitidos = ["status", "situacao", "atribuido_a", "data_finalizacao", "ativo",
+                         "projeto", "atividade", "orgao_site_consultado", "url_consulta"]
+    payload = {k: v for k, v in kwargs.items() if k in campos_permitidos and v is not None}
+
+    if not payload:
+        return {"error": "Nenhum campo válido para atualizar foi fornecido."}
+
+    result = sb.table("protocols").update(payload).eq("id", protocol_id).execute()
+    if not result.data:
+        return {"error": "Erro ao atualizar protocolo."}
+    return {"sucesso": True, "protocolo": result.data[0]}
+
+
 def _run_tool(name: str, args: dict, sb: SupabaseClient):
     if name == "buscar_protocolos":
         return _buscar_protocolos(sb, **args)
+    if name == "buscar_protocolo_por_numero":
+        return _buscar_protocolo_por_numero(sb, **args)
     if name == "resumo_dashboard":
         return _resumo_dashboard(sb)
+    if name == "criar_protocolo":
+        return _criar_protocolo(sb, **args)
+    if name == "atualizar_protocolo":
+        return _atualizar_protocolo(sb, **args)
     return {"error": "Ferramenta desconhecida"}
 
 
