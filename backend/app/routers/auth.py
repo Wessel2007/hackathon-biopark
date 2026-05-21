@@ -9,6 +9,7 @@ from app.supabase_client import SupabaseClient, get_supabase
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
+
 def create_access_token(data: dict) -> str:
     payload = data.copy()
     payload["exp"] = datetime.utcnow() + timedelta(minutes=settings.access_token_expire_minutes)
