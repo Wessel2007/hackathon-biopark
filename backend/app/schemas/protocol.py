@@ -4,6 +4,13 @@ from typing import Optional, List
 from pydantic import BaseModel, field_validator, model_validator
 
 
+def _strip_or_none(v: Optional[str]) -> Optional[str]:
+    if v is None:
+        return None
+    s = str(v).strip()
+    return s if s else None
+
+
 class ProtocolBase(BaseModel):
     status: str
     projeto: str
@@ -14,8 +21,22 @@ class ProtocolBase(BaseModel):
     data_abertura: date
     data_finalizacao: Optional[date] = None
     situacao: Optional[str] = None
+    anotacoes: Optional[str] = None
     ativo: bool = True
     url_consulta: Optional[str] = None
+
+    @field_validator("orgao_site_consultado", "atribuido_a", "anotacoes", mode="before")
+    @classmethod
+    def strip_text_fields(cls, v):
+        return _strip_or_none(v) if v is not None and v != "" else v
+
+    @model_validator(mode="after")
+    def validate_regra4(self):
+        if not (self.orgao_site_consultado or "").strip():
+            raise ValueError("Órgão / site consultado é obrigatório")
+        if self.ativo and not (self.atribuido_a or "").strip():
+            raise ValueError("Atribuído a é obrigatório para protocolo ativo")
+        return self
 
 
 class ProtocolCreate(ProtocolBase):
@@ -32,6 +53,7 @@ class ProtocolUpdate(BaseModel):
     data_abertura: Optional[date] = None
     data_finalizacao: Optional[date] = None
     situacao: Optional[str] = None
+    anotacoes: Optional[str] = None
     ativo: Optional[bool] = None
     url_consulta: Optional[str] = None
 
@@ -42,6 +64,9 @@ class ProtocolUpdate(BaseModel):
             for key in ("data_abertura", "data_finalizacao"):
                 if data.get(key) == "":
                     data[key] = None
+            for key in ("orgao_site_consultado", "atribuido_a", "anotacoes"):
+                if key in data and data[key] is not None:
+                    data[key] = _strip_or_none(data[key])
         return data
 
 

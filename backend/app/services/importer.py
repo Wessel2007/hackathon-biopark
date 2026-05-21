@@ -20,7 +20,7 @@ STATUS_MAP = {
 _SEPS = [" – ", " - ", " / ", "– "]
 
 _CAMPOS_OBRIGATORIOS = ("status", "projeto", "protocolo", "atividade")
-_CAMPOS_TEXTO = ("orgao_site_consultado", "atribuido_a", "situacao", "url_consulta", "observacao_consulta")
+_CAMPOS_TEXTO = ("orgao_site_consultado", "atribuido_a", "situacao", "anotacoes", "url_consulta", "observacao_consulta")
 _CAMPOS_DATA = ("data_abertura", "data_finalizacao")
 
 # Limites do schema Supabase. Após rodar migration_widen_protocol_text.sql,
@@ -34,6 +34,7 @@ _LIMITES_CAMPO = {
     "atribuido_a": 100,
     "situacao": 100,
     "url_consulta": 500,
+    "anotacoes": 10000,
 }
 
 # Fallback para bancos ainda com VARCHAR(200) — evita erro 22001 sem migration
@@ -202,6 +203,15 @@ def _revalidar_payload(reg: dict):
     else:
         payload["ativo"] = bool(ativo) if ativo is not None else True
 
+    anotacoes = _limpa_texto(reg.get("anotacoes"))
+    if anotacoes:
+        payload["anotacoes"] = anotacoes
+
+    if not (payload.get("orgao_site_consultado") or "").strip():
+        return None, "Campo obrigatório ausente: orgao_site_consultado"
+    if payload["ativo"] and not (payload.get("atribuido_a") or "").strip():
+        return None, "Campo obrigatório ausente: atribuido_a (protocolo ativo)"
+
     avisos = _aplicar_limites_payload(payload, _LIMITES_CAMPO)
     if avisos:
         return payload, "; ".join(avisos)
@@ -278,6 +288,8 @@ def _processar_aba_base(ws, nome_aba):
             data_abertura = _formata_data(_safe_get(row, idx.get("data_abertura", 8)))
             data_finalizacao = _formata_data(_safe_get(row, idx.get("data_finalizacao", 9)))
             situacao = _limpa_texto(_safe_get(row, idx.get("situacao")))
+            anotacoes = _limpa_texto(_safe_get(row, idx.get("anotacoes")))
+            ativo = _inferir_ativo(status, data_finalizacao)
 
             if not all([status, projeto, protocolo, atividade]):
                 ignorados.append({"linha": linha, "motivo": "Campos obrigatórios ausentes"})
@@ -287,18 +299,27 @@ def _processar_aba_base(ws, nome_aba):
                 ignorados.append({"linha": linha, "motivo": "data_abertura ausente ou inválida"})
                 continue
 
+            if not orgao:
+                ignorados.append({"linha": linha, "motivo": "Órgão / site consultado ausente"})
+                continue
+
+            if ativo and not atribuido_a:
+                ignorados.append({"linha": linha, "motivo": "Atribuído a ausente (protocolo ativo)"})
+                continue
+
             registros.append({
                 "linha": linha,
                 "status": status,
                 "projeto": projeto,
                 "protocolo": protocolo,
                 "atividade": atividade,
-                "orgao_site_consultado": orgao or "",
+                "orgao_site_consultado": orgao,
                 "atribuido_a": atribuido_a,
                 "data_abertura": data_abertura,
                 "data_finalizacao": data_finalizacao,
                 "situacao": situacao,
-                "ativo": _inferir_ativo(status, data_finalizacao),
+                "anotacoes": anotacoes,
+                "ativo": ativo,
                 "url_consulta": None,
                 "observacao_consulta": None,
             })
@@ -350,6 +371,13 @@ def _processar_carga_inicial(file_buffer):
 
             data_finalizacao = _formata_data(row.get("data_finalizacao"))
             ativo_raw = str(_cel(row, "ativo", "Sim")).strip().lower()
+            ativo = ativo_raw in ("sim", "yes", "true", "1")
+            atribuido_a = str(_cel(row, "atribuido_a")).strip() or None
+            anotacoes = str(_cel(row, "anotacoes")).strip() or None
+
+            if ativo and not atribuido_a:
+                ignorados.append({"linha": linha, "motivo": "Atribuído a ausente (protocolo ativo)"})
+                continue
 
             registros.append({
                 "linha": linha,
@@ -358,11 +386,12 @@ def _processar_carga_inicial(file_buffer):
                 "protocolo": protocolo,
                 "atividade": atividade,
                 "orgao_site_consultado": orgao,
-                "atribuido_a": str(_cel(row, "atribuido_a")).strip() or None,
+                "atribuido_a": atribuido_a,
                 "data_abertura": data_abertura,
                 "data_finalizacao": data_finalizacao,
                 "situacao": str(_cel(row, "situacao")).strip() or None,
-                "ativo": ativo_raw in ("sim", "yes", "true", "1"),
+                "anotacoes": anotacoes,
+                "ativo": ativo,
                 "url_consulta": str(_cel(row, "url_consulta")).strip() or None,
                 "observacao_consulta": str(_cel(row, "observacao_consulta")).strip() or None,
             })

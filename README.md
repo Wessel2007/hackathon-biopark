@@ -90,9 +90,34 @@ npm run dev
 | GET | /reports/dashboard-data | Dados do dashboard |
 | GET | /reports/pdf | Baixar relatório em PDF |
 
+## Consultas aos órgãos
+
+A plataforma distingue consulta **real** e **simulada**. O histórico grava `fonte_consulta` em cada execução.
+
+| Órgão / tipo | Modo | Implementação |
+|--------------|------|----------------|
+| Cartório de Imóveis (PR) — `cartoriospr.com.br` | **Real** | Playwright em `backend/app/services/scraper.py` (screenshot + parse HTML) |
+| COPEL | Simulado | `backend/app/services/scrapers/copel.py` — prefixo `SIMULADO: COPEL` |
+| SANEPAR | Simulado | `scrapers/sanepar.py` |
+| Corpo de Bombeiros (CBPR) | Simulado | `scrapers/bombeiros.py` |
+| SEMA / IAT (ambiental) | Simulado | `scrapers/sema.py` |
+| Caixa Econômica Federal | Simulado | `scrapers/caixa.py` |
+| Prefeitura / município | Simulado | `scrapers/prefeitura.py` |
+| Demais órgãos | Simulado | `scrapers/default.py` |
+
+Na demonstração, compare um protocolo de cartório (consulta real) com outro órgão (campo `fonte_consulta` com `SIMULADO:`).
+
+## Relatório PDF
+
+`GET /reports/pdf` gera PDF com: resumo geral, protocolos com mudança, com erro, sem atualização e tabelas por empreendimento (inclui órgão, observação e data da consulta).
+
 ## Credenciais padrão do dashboard
-Configure no `.env`:
-```
-DASHBOARD_EMAIL=admin@biopark.com.br
-DASHBOARD_PASSWORD=biopark2025
-```
+
+Usuários são cadastrados na tabela `usuarios` do Supabase. Exemplo para desenvolvimento:
+
+| Campo | Valor |
+|-------|-------|
+| E-mail | admin@biopark.com.br |
+| Senha | biopark2025 |
+
+Relatórios analíticos (`/reports`) exigem cargo `admin` e segundo login em `/reports-login`.

@@ -54,3 +54,17 @@ Frontend disponível em http://localhost:5173
 |-------|-------|
 | E-mail | admin@biopark.com.br |
 | Senha | biopark2025 |
+
+O Dashboard (`/`) usa o token principal. A página de relatórios (`/reports`) pede login adicional com usuário **admin**.
+
+## Demo — consultas reais vs. simuladas
+
+1. No Dashboard, abra o bloco **“Consultas aos órgãos — real vs. simulado”**.
+2. Consulte um protocolo de **Cartório de Imóveis** → `fonte_consulta` indica `CARTÓRIO PR`.
+3. Consulte um protocolo de **COPEL** (ou outro órgão) → `fonte_consulta` começa com `SIMULADO:`.
+
+Tabela completa no [README.md](README.md#consultas-aos-órgãos).
+
+## Relatório PDF
+
+Com o backend rodando e autenticado, use **Baixar PDF** no Dashboard ou em Relatórios. O arquivo inclui resumo, mudanças, erros e visão por empreendimento.

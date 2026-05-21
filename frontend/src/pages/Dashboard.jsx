@@ -29,13 +29,13 @@ const STATUS_CONFIG = [
 const EMPTY_FORM = {
   status: 'PENDENTE', projeto: '', protocolo: '', atividade: '',
   orgao_site_consultado: '', atribuido_a: '', data_abertura: '',
-  data_finalizacao: '', situacao: '', ativo: true, url_consulta: '',
+  data_finalizacao: '', situacao: '', anotacoes: '', ativo: true, url_consulta: '',
 }
 
 const CAMPOS = [
-  ['status', 'Status'], ['projeto', 'Projeto'], ['protocolo', 'Protocolo'],
-  ['atividade', 'Atividade'], ['orgao_site_consultado', 'Órgão / Site'],
-  ['atribuido_a', 'Atribuído a'], ['data_abertura', 'Data Abertura'],
+  ['status', 'Status'], ['projeto', 'Projeto *'], ['protocolo', 'Protocolo *'],
+  ['atividade', 'Atividade *'], ['orgao_site_consultado', 'Órgão / Site *'],
+  ['atribuido_a', 'Atribuído a'], ['data_abertura', 'Data Abertura *'],
   ['data_finalizacao', 'Data Finalização'], ['situacao', 'Situação'],
   ['url_consulta', 'URL Consulta'],
 ]
@@ -172,6 +172,7 @@ export default function Dashboard() {
     if (!form.atividade?.trim())             return setFormError('Atividade é obrigatória')
     if (!form.orgao_site_consultado?.trim()) return setFormError('Órgão / Site é obrigatório')
     if (!form.data_abertura)                 return setFormError('Data de Abertura é obrigatória')
+    if (form.ativo && !form.atribuido_a?.trim()) return setFormError('Atribuído a é obrigatório para protocolo ativo')
     setFormError(null)
     const payload = {
       status:                form.status,
@@ -179,10 +180,11 @@ export default function Dashboard() {
       protocolo:             form.protocolo,
       atividade:             form.atividade,
       orgao_site_consultado: form.orgao_site_consultado,
-      atribuido_a:           form.atribuido_a   || null,
+      atribuido_a:           form.atribuido_a?.trim() || null,
       data_abertura:         form.data_abertura,
       data_finalizacao:      form.data_finalizacao || null,
       situacao:              form.situacao      || null,
+      anotacoes:             form.anotacoes?.trim() || null,
       ativo:                 form.ativo,
       url_consulta:          form.url_consulta  || null,
     }
@@ -370,6 +372,21 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* ═══ Consulta real vs simulada ═══ */}
+        <details className="rounded-xl mb-4 bg-sky-50/80 border border-sky-100 text-sm">
+          <summary className="px-4 py-3 cursor-pointer font-medium text-sky-900 select-none">
+            Consultas aos órgãos — real vs. simulado
+          </summary>
+          <div className="px-4 pb-3 text-sky-800/90 text-xs leading-relaxed space-y-2">
+            <p>
+              Consulta <strong>real</strong> apenas para <strong>Cartório de Imóveis (PR)</strong> via cartoriospr.com.br.
+              Demais órgãos (COPEL, SANEPAR, Bombeiros, SEMA/IAT, Caixa, Prefeitura) usam <strong>simulação controlada</strong>;
+              o campo <code className="font-mono bg-white/60 px-1 rounded">fonte_consulta</code> no histórico indica <code className="font-mono">SIMULADO:</code>.
+            </p>
+            <p className="text-sky-700/80">Detalhes no README do repositório, seção &quot;Consultas aos órgãos&quot;.</p>
+          </div>
+        </details>
+
         {/* ═══ Filters ═══ */}
         <div className="flex items-center gap-2 mb-4 flex-wrap">
           <div className="relative flex-1 min-w-[260px]">
@@ -510,7 +527,9 @@ export default function Dashboard() {
           <div className="grid grid-cols-2 gap-4">
             {CAMPOS.map(([key, label]) => (
               <div key={key}>
-                <label className="block text-[11px] font-medium text-muted mb-1.5 uppercase tracking-wider">{label}</label>
+                <label className="block text-[11px] font-medium text-muted mb-1.5 uppercase tracking-wider">
+                  {label}{key === 'atribuido_a' && form.ativo ? ' *' : ''}
+                </label>
                 <input
                   type={key.startsWith('data') ? 'date' : 'text'}
                   value={form[key] ?? ''}
@@ -519,6 +538,16 @@ export default function Dashboard() {
                 />
               </div>
             ))}
+            <div className="col-span-2">
+              <label className="block text-[11px] font-medium text-muted mb-1.5 uppercase tracking-wider">Anotações</label>
+              <textarea
+                rows={3}
+                value={form.anotacoes ?? ''}
+                onChange={e => setForm(f => ({ ...f, anotacoes: e.target.value }))}
+                placeholder="Observações internas sobre o protocolo…"
+                className="w-full bg-paper border border-line-2 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ink/10 focus:border-ink/30 transition resize-y"
+              />
+            </div>
             <label className="col-span-2 flex items-center gap-2.5 bg-paper rounded-lg px-3 py-2.5 border border-line-2 cursor-pointer">
               <input type="checkbox" checked={form.ativo} onChange={e => setForm(f => ({ ...f, ativo: e.target.checked }))} className="w-4 h-4 rounded accent-ink" />
               <span className="text-sm font-medium">Protocolo ativo</span>
@@ -566,7 +595,7 @@ export default function Dashboard() {
               <table className="w-full text-xs">
                 <thead>
                   <tr className="bg-paper border-b border-line text-muted text-left uppercase tracking-wider">
-                    {['Linha','Projeto','Protocolo','Atividade','Status','Abertura'].map(h => <th key={h} className="px-3 py-2 font-medium whitespace-nowrap">{h}</th>)}
+                    {['Linha','Projeto','Protocolo','Atividade','Órgão','Status','Abertura'].map(h => <th key={h} className="px-3 py-2 font-medium whitespace-nowrap">{h}</th>)}
                   </tr>
                 </thead>
                 <tbody>
@@ -576,6 +605,7 @@ export default function Dashboard() {
                       <td className="px-3 py-2 font-medium">{row.projeto}</td>
                       <td className="px-3 py-2 font-mono text-muted">{row.protocolo}</td>
                       <td className="px-3 py-2 text-ink-2 max-w-xs truncate">{row.atividade}</td>
+                      <td className="px-3 py-2 text-muted max-w-[120px] truncate">{row.orgao_site_consultado || '—'}</td>
                       <td className="px-3 py-2"><StatusChip status={row.status} /></td>
                       <td className="px-3 py-2 text-muted">{row.data_abertura}</td>
                     </tr>
@@ -684,6 +714,11 @@ export default function Dashboard() {
           {queryResult.resultado?.status_consultado && (
             <p className="text-xs text-muted mt-3">
               Status atual: <span className="font-medium text-ink">{queryResult.resultado.status_consultado}</span>
+            </p>
+          )}
+          {queryResult.resultado?.fonte_consulta && (
+            <p className="text-xs text-muted mt-2">
+              Fonte: <span className="font-mono text-ink-2">{queryResult.resultado.fonte_consulta}</span>
             </p>
           )}
           <button onClick={() => setQueryResult(null)} className="mt-4 w-full py-2.5 bg-ink text-lime hover:bg-ink-2 rounded-lg text-sm font-semibold transition">Ok</button>

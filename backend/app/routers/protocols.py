@@ -82,14 +82,31 @@ def create_protocol(body: ProtocolCreate, sb: SupabaseClient = Depends(get_supab
     return _add_duracao(result.data[0])
 
 
+def _validate_update_regra4(current: dict, payload: dict) -> None:
+    orgao = payload.get("orgao_site_consultado", current.get("orgao_site_consultado"))
+    ativo = payload.get("ativo", current.get("ativo", True))
+    atribuido = payload.get("atribuido_a", current.get("atribuido_a"))
+    if not (orgao or "").strip():
+        raise HTTPException(status_code=422, detail="Órgão / site consultado é obrigatório")
+    if ativo and not (atribuido or "").strip():
+        raise HTTPException(status_code=422, detail="Atribuído a é obrigatório para protocolo ativo")
+
+
 @router.patch("/{protocol_id}")
 def update_protocol(
     protocol_id: int, body: ProtocolUpdate, sb: SupabaseClient = Depends(get_supabase), _: str = Depends(get_current_user)
 ):
-    existing = sb.table("protocols").select("id").eq("id", protocol_id).maybe_single().execute()
+    existing = (
+        sb.table("protocols")
+        .select("id, orgao_site_consultado, atribuido_a, ativo")
+        .eq("id", protocol_id)
+        .maybe_single()
+        .execute()
+    )
     if not existing.data:
         raise HTTPException(status_code=404, detail="Protocolo não encontrado")
     payload = {k: v for k, v in body.model_dump(exclude_unset=True).items()}
+    _validate_update_regra4(existing.data, payload)
     if "projeto" in payload and payload["projeto"]:
         payload["projeto"] = _normaliza_projeto(payload["projeto"])
     for k, v in payload.items():

@@ -74,12 +74,13 @@ TOOLS = [
                         "description": "Status inicial do protocolo (padrão: PENDENTE)",
                     },
                     "data_abertura":    {"type": "string", "description": "Data de abertura no formato YYYY-MM-DD"},
-                    "atribuido_a":      {"type": "string", "description": "Nome do responsável pelo protocolo"},
+                    "atribuido_a":      {"type": "string", "description": "Nome do responsável pelo protocolo (obrigatório)"},
                     "situacao":         {"type": "string", "description": "Descrição da situação atual"},
+                    "anotacoes":        {"type": "string", "description": "Anotações internas sobre o protocolo"},
                     "url_consulta":     {"type": "string", "description": "URL para consulta do protocolo"},
                     "data_finalizacao": {"type": "string", "description": "Data de finalização no formato YYYY-MM-DD (opcional)"},
                 },
-                "required": ["projeto", "protocolo", "atividade", "orgao_site_consultado", "data_abertura"],
+                "required": ["projeto", "protocolo", "atividade", "orgao_site_consultado", "data_abertura", "atribuido_a"],
             },
         },
     },
@@ -99,6 +100,7 @@ TOOLS = [
                     },
                     "situacao":         {"type": "string", "description": "Nova descrição da situação"},
                     "atribuido_a":      {"type": "string", "description": "Novo responsável"},
+                    "anotacoes":        {"type": "string", "description": "Anotações internas"},
                     "data_finalizacao": {"type": "string", "description": "Data de finalização no formato YYYY-MM-DD"},
                     "ativo":            {"type": "boolean", "description": "true = ativo, false = inativo"},
                 },
@@ -155,15 +157,22 @@ def _resumo_dashboard(sb: SupabaseClient):
 
 
 def _criar_protocolo(sb: SupabaseClient, user_email: str = "", **kwargs):
+    atribuido = (kwargs.get("atribuido_a") or "").strip()
+    orgao = (kwargs.get("orgao_site_consultado") or "").strip()
+    if not orgao:
+        return {"error": "Órgão / site consultado é obrigatório."}
+    if not atribuido:
+        return {"error": "Atribuído a é obrigatório para protocolo ativo."}
     payload = {
         "status":                kwargs.get("status", "PENDENTE"),
         "projeto":               kwargs["projeto"],
         "protocolo":             kwargs["protocolo"],
         "atividade":             kwargs["atividade"],
-        "orgao_site_consultado": kwargs["orgao_site_consultado"],
+        "orgao_site_consultado": orgao,
         "data_abertura":         kwargs["data_abertura"],
-        "atribuido_a":           kwargs.get("atribuido_a"),
+        "atribuido_a":           atribuido,
         "situacao":              kwargs.get("situacao"),
+        "anotacoes":             kwargs.get("anotacoes"),
         "url_consulta":          kwargs.get("url_consulta"),
         "data_finalizacao":      kwargs.get("data_finalizacao"),
         "ativo":                 True,
@@ -193,12 +202,20 @@ def _atualizar_protocolo(sb: SupabaseClient, numero: str, user_email: str = "", 
 
     antes = existing.data[0]
     protocol_id = antes["id"]
-    campos_permitidos = ["status", "situacao", "atribuido_a", "data_finalizacao", "ativo",
+    campos_permitidos = ["status", "situacao", "atribuido_a", "anotacoes", "data_finalizacao", "ativo",
                          "projeto", "atividade", "orgao_site_consultado", "url_consulta"]
     payload = {k: v for k, v in kwargs.items() if k in campos_permitidos and v is not None}
 
     if not payload:
         return {"error": "Nenhum campo válido para atualizar foi fornecido."}
+
+    merged_ativo = payload.get("ativo", antes.get("ativo", True))
+    merged_orgao = payload.get("orgao_site_consultado", antes.get("orgao_site_consultado"))
+    merged_atribuido = payload.get("atribuido_a", antes.get("atribuido_a"))
+    if not (merged_orgao or "").strip():
+        return {"error": "Órgão / site consultado é obrigatório."}
+    if merged_ativo and not (merged_atribuido or "").strip():
+        return {"error": "Atribuído a é obrigatório para protocolo ativo."}
 
     result = sb.table("protocols").update(payload).eq("id", protocol_id).execute()
     if not result.data:
