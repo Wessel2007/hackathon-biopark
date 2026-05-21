@@ -12,11 +12,14 @@ router = APIRouter(prefix="/protocols", tags=["protocols"])
 def _add_duracao(p: dict) -> dict:
     abertura = p.get("data_abertura")
     fim = p.get("data_finalizacao")
-    if abertura:
-        d_abertura = date.fromisoformat(abertura)
-        d_fim = date.fromisoformat(fim) if fim else date.today()
-        p["duracao_dias"] = (d_fim - d_abertura).days
-    else:
+    try:
+        if not abertura:
+            p["duracao_dias"] = None
+            return p
+        d_abertura = date.fromisoformat(str(abertura))
+        d_fim = date.fromisoformat(str(fim)) if fim else date.today()
+        p["duracao_dias"] = max(0, (d_fim - d_abertura).days)
+    except (ValueError, TypeError):
         p["duracao_dias"] = None
     return p
 
