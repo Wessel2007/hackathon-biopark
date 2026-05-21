@@ -124,6 +124,22 @@ def _is_cartorios_pr_query(p: dict) -> bool:
     )
 
 
+# Scraper real - ePROTOCOLO PR (Corpo de Bombeiros do Paraná / CBPR)
+def _is_eprotocolo_cbpr_query(p: dict) -> bool:
+    """Retorna True para consultas de protocolo do CBPR no portal ePROTOCOLO."""
+    url = (p.get("url_consulta") or "").lower()
+    orgao = _normalize(p.get("orgao_site_consultado") or "")
+    url_eprotocolo = (
+        "eprotocolo.pr.gov.br" in url
+        or "consultarprotocoldigital" in url
+    )
+    orgao_bombeiros = "bombeiro" in orgao or "cbpr" in orgao or "cbmpr" in orgao
+    return url_eprotocolo or (
+        orgao_bombeiros
+        and ("eprotocolo" in orgao or "protocolo integrado" in orgao)
+    )
+
+
 # Scraper real - Equiplano Toledo (CARMEL)
 def _is_equiplano_toledo_carmel_query(p: dict) -> bool:
     """Retorna True para processos da CARMEL no Equiplano do Municipio de Toledo."""
@@ -397,6 +413,11 @@ def _query_source(p: dict) -> dict:
     if _is_equiplano_toledo_carmel_query(p):
         from app.services.scrapers.dispatcher import _to_internal
         from app.services.scrapers.equiplano_toledo import query_protocol
+
+        return _to_internal(query_protocol(p))
+    if _is_eprotocolo_cbpr_query(p):
+        from app.services.scrapers.dispatcher import _to_internal
+        from app.services.scrapers.eprotocolo_pr import query_protocol
 
         return _to_internal(query_protocol(p))
     from app.services.scrapers.dispatcher import check_protocol_status

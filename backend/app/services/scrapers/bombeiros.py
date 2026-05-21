@@ -1,9 +1,11 @@
 """
-Scraper para Corpo de Bombeiros do Paraná (CBPR).
+Scraper simulado para Corpo de Bombeiros do Paraná (CBPR).
 
-O sistema CBPR exige login no portal cbpr.pr.gov.br para consulta de
-processos de AVCB (Auto de Vistoria do Corpo de Bombeiros). Este módulo
-simula o fluxo de consulta de aprovação de projetos de segurança contra incêndio.
+Consultas reais no ePROTOCOLO (eprotocolo.pr.gov.br) são feitas por
+``eprotocolo_pr.py`` quando a URL de consulta aponta para esse portal.
+
+Este módulo cobre demais fluxos (ex.: cbpr.pr.gov.br com login) onde ainda
+não há automação — simula aprovação de projetos de segurança contra incêndio.
 """
 
 import random

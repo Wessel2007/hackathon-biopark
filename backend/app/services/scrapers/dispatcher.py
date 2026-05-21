@@ -51,7 +51,12 @@ def _select_scraper(orgao: str, url: str):
         from app.services.scrapers.sanepar import query
         return query
 
-    if "bombeiro" in norm or "cbpr" in url or "bombeiros.pr" in url:
+    # CBPR — consulta real no ePROTOCOLO; demais URLs do bombeiro seguem simulado
+    if "eprotocolo" in url or "eprotocolo.pr.gov.br" in url:
+        from app.services.scrapers.eprotocolo_pr import query
+        return query
+
+    if "bombeiro" in norm or "cbpr" in norm or "cbmpr" in norm or "cbpr" in url or "bombeiros.pr" in url:
         from app.services.scrapers.bombeiros import query
         return query
 
