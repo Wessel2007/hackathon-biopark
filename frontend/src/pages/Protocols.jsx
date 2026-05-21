@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router-dom'
 const EMPTY_FORM = {
   status: 'PENDENTE', projeto: '', protocolo: '', atividade: '',
   orgao_site_consultado: '', atribuido_a: '', data_abertura: '',
-  data_finalizacao: '', situacao: '', anotacoes: '', ativo: true, url_consulta: '',
+  data_finalizacao: '', situacao: '', ativo: true, url_consulta: '',
 }
 
 export default function Protocols() {
@@ -87,7 +87,7 @@ export default function Protocols() {
     ['atividade', 'Atividade'], ['orgao_site_consultado', 'Órgão / Site'],
     ['atribuido_a', 'Atribuído a'], ['data_abertura', 'Data Abertura'],
     ['data_finalizacao', 'Data Finalização'], ['situacao', 'Situação'],
-    ['url_consulta', 'URL Consulta'], ['anotacoes', 'Anotações'],
+    ['url_consulta', 'URL Consulta'],
   ]
 
   return (
@@ -129,16 +129,11 @@ export default function Protocols() {
               <h2 className="text-lg font-semibold mb-4">{editItem ? 'Editar Protocolo' : 'Novo Protocolo'}</h2>
               <div className="grid grid-cols-2 gap-3">
                 {campos.map(([key, label]) => (
-                  <div key={key} className={key === 'anotacoes' ? 'col-span-2' : ''}>
+                  <div key={key}>
                     <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
-                    {key === 'anotacoes' ? (
-                      <textarea rows={2} value={form[key] ?? ''} onChange={(e) => setForm(f => ({ ...f, [key]: e.target.value }))}
-                        className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500" />
-                    ) : (
-                      <input type={key.startsWith('data') ? 'date' : 'text'} value={form[key] ?? ''}
-                        onChange={(e) => setForm(f => ({ ...f, [key]: e.target.value }))}
-                        className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500" />
-                    )}
+                    <input type={key.startsWith('data') ? 'date' : 'text'} value={form[key] ?? ''}
+                      onChange={(e) => setForm(f => ({ ...f, [key]: e.target.value }))}
+                      className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500" />
                   </div>
                 ))}
                 <div className="flex items-center gap-2 col-span-2">

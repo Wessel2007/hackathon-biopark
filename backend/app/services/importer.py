@@ -62,7 +62,6 @@ def import_spreadsheet(file_buffer, sb: Client) -> dict:
                 "data_abertura": data_abertura,
                 "data_finalizacao": data_finalizacao,
                 "situacao": str(row.get("situacao", "")).strip() or None,
-                "anotacoes": str(row.get("anotacoes", "")).strip() or None,
                 "ativo": ativo,
                 "url_consulta": str(row.get("url_consulta", "")).strip() or None,
                 "observacao_consulta": str(row.get("observacao_consulta", "")).strip() or None,

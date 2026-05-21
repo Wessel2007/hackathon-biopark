@@ -135,7 +135,6 @@ def processar_aba(ws, nome_aba):
         atribuido_a  = limpa_texto(row[idx.get("atribuido_a", 4)])
         data_aber    = formata_data(row[idx.get("data_abertura", 8)])
         data_fim     = formata_data(row[idx.get("data_finalizacao", 9)])
-        anotacoes    = limpa_texto(row[idx.get("anotacoes")] if "anotacoes" in idx else None)
         situacao     = limpa_texto(row[idx.get("situacao")] if "situacao" in idx else None)
 
         ativo = inferir_ativo(status, data_fim)
@@ -150,7 +149,6 @@ def processar_aba(ws, nome_aba):
             "data_abertura":        data_aber,
             "data_finalizacao":     data_fim,
             "situacao":             situacao,
-            "anotacoes":            anotacoes,
             "ativo":                ativo,
             "url_consulta":         None,
             "ultima_consulta":      None,
@@ -170,7 +168,7 @@ def gerar_carga():
         "status", "projeto", "protocolo", "atividade",
         "orgao_site_consultado", "atribuido_a",
         "data_abertura", "data_finalizacao",
-        "situacao", "anotacoes", "ativo",
+        "situacao", "ativo",
         "url_consulta", "ultima_consulta", "observacao_consulta",
         # duracao_calculada_dias ignorada
     ]

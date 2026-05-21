@@ -13,7 +13,6 @@ class ProtocolBase(BaseModel):
     data_abertura: date
     data_finalizacao: Optional[date] = None
     situacao: Optional[str] = None
-    anotacoes: Optional[str] = None
     ativo: bool = True
     url_consulta: Optional[str] = None
 
@@ -32,7 +31,6 @@ class ProtocolUpdate(BaseModel):
     data_abertura: Optional[date] = None
     data_finalizacao: Optional[date] = None
     situacao: Optional[str] = None
-    anotacoes: Optional[str] = None
     ativo: Optional[bool] = None
     url_consulta: Optional[str] = None
 
