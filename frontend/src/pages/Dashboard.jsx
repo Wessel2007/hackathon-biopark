@@ -11,7 +11,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   FileText, RefreshCw, LogOut, AlertTriangle, BarChart3,
   Plus, Upload, Search, X, Pencil, Trash2, Bell, Command,
-  ChevronDown, MoreHorizontal,
+  ChevronDown, MoreHorizontal, History, ArrowRight, CheckCircle2,
 } from 'lucide-react'
 
 const STATUS_CONFIG = [
@@ -64,6 +64,7 @@ export default function Dashboard() {
   const [selected,        setSelected]        = useState(new Set())
   const [showBulkConfirm, setShowBulkConfirm] = useState(false)
   const [queryResult,     setQueryResult]     = useState(null)
+  const [historyItem,     setHistoryItem]     = useState(null)
 
   /* ─── queries ─── */
   const { data: dashData } = useQuery({
@@ -483,6 +484,9 @@ export default function Dashboard() {
                           <button onClick={() => queryMut.mutate(p.id)} title="Consultar" className="w-7 h-7 rounded-md flex items-center justify-center text-muted hover:text-ink hover:bg-paper transition">
                             <RefreshCw size={13} />
                           </button>
+                          <button onClick={() => setHistoryItem(p)} title="Histórico de consultas" className="w-7 h-7 rounded-md flex items-center justify-center text-muted hover:text-ink hover:bg-paper transition">
+                            <History size={13} />
+                          </button>
                           <button onClick={() => openEdit(p)} title="Editar" className="w-7 h-7 rounded-md flex items-center justify-center text-muted hover:text-ink hover:bg-paper transition">
                             <Pencil size={13} />
                           </button>
@@ -677,6 +681,11 @@ export default function Dashboard() {
       )}
     </div>
 
+      {/* ═══ History modal ═══ */}
+      {historyItem && (
+        <HistoryModal item={historyItem} onClose={() => setHistoryItem(null)} />
+      )}
+
       <AgentChat />
     </>
   )
@@ -760,6 +769,126 @@ function ResultRow({ tone, label, value }) {
     <div className={`flex items-center justify-between border rounded-lg px-4 py-2.5 ${map.bg}`}>
       <span className={`text-sm ${map.fg}`}>{label}</span>
       <span className={`font-semibold num ${map.fg}`}>{value}</span>
+    </div>
+  )
+}
+
+function parseMudancas(v) {
+  if (!v) return []
+  if (Array.isArray(v)) return v
+  try { return JSON.parse(v) } catch { return [] }
+}
+
+function HistoryModal({ item, onClose }) {
+  const history = [...(item.query_history || [])].sort(
+    (a, b) => new Date(b.data_consulta) - new Date(a.data_consulta)
+  )
+
+  return (
+    <Modal
+      onClose={onClose}
+      title={
+        <div className="flex items-center gap-2">
+          <History size={15} className="text-muted" />
+          <span>Histórico</span>
+          <span className="font-mono text-muted text-sm font-normal">— {item.protocolo}</span>
+          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-paper text-muted border border-line-2">
+            {history.length} consulta(s)
+          </span>
+        </div>
+      }
+      width="max-w-2xl"
+    >
+      {history.length === 0 ? (
+        <div className="py-12 flex flex-col items-center gap-3 text-center text-muted">
+          <History size={28} className="opacity-30" />
+          <p className="text-sm">Nenhuma consulta realizada ainda.</p>
+          <p className="text-xs text-muted-faint">Use o botão <RefreshCw size={10} className="inline mx-0.5" /> para consultar este protocolo.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {history.map((h, i) => (
+            <HistoryEntry key={h.id ?? i} entry={h} isLatest={i === 0} />
+          ))}
+        </div>
+      )}
+    </Modal>
+  )
+}
+
+function HistoryEntry({ entry, isLatest }) {
+  const mudancas = parseMudancas(entry.mudancas_detectadas)
+  const dt = new Date(entry.data_consulta)
+  const dataFormatada = dt.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
+  const horaFormatada = dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  const statusMudou = entry.status_anterior && entry.status_consultado && entry.status_anterior !== entry.status_consultado
+
+  return (
+    <div className={`rounded-xl border p-4 transition ${
+      entry.houve_mudanca
+        ? 'border-amber-200 bg-amber-50/40'
+        : entry.erro
+          ? 'border-red-100 bg-red-50/30'
+          : 'border-line bg-paper'
+    }`}>
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="font-mono text-[11px] text-muted">{dataFormatada} às {horaFormatada}</span>
+          {isLatest && (
+            <span className="pill bg-ink text-lime text-[9px] uppercase tracking-wider">Mais recente</span>
+          )}
+          {entry.houve_mudanca ? (
+            <span className="pill bg-amber-100 text-amber-800 text-[10px]">
+              <AlertTriangle size={9} className="inline mr-1" />Mudança detectada
+            </span>
+          ) : entry.erro ? (
+            <span className="pill bg-red-50 text-red-700 text-[10px]">Erro</span>
+          ) : (
+            <span className="pill bg-emerald-50 text-emerald-700 text-[10px]">
+              <CheckCircle2 size={9} className="inline mr-1" />Sem alterações
+            </span>
+          )}
+        </div>
+        {entry.fonte_consulta && (
+          <span className="text-[10px] text-muted-faint font-mono truncate max-w-[180px]">{entry.fonte_consulta}</span>
+        )}
+      </div>
+
+      {/* Status comparison */}
+      {statusMudou ? (
+        <div className="mt-3 flex items-center gap-2 flex-wrap">
+          <StatusChip status={entry.status_anterior} />
+          <ArrowRight size={12} className="text-muted shrink-0" />
+          <StatusChip status={entry.status_consultado} />
+        </div>
+      ) : entry.status_consultado ? (
+        <div className="mt-3">
+          <StatusChip status={entry.status_consultado} />
+        </div>
+      ) : null}
+
+      {/* Changes list */}
+      {mudancas.length > 0 && (
+        <ul className="mt-3 space-y-1">
+          {mudancas.map((m, i) => (
+            <li key={i} className="flex items-start gap-2 text-xs text-amber-800 bg-amber-100/60 rounded-lg px-3 py-2">
+              <AlertTriangle size={11} className="mt-0.5 shrink-0 text-amber-500" />
+              {m}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {/* Observation */}
+      {entry.observacao && (
+        <p className="mt-3 text-xs text-muted leading-relaxed border-t border-line pt-3">{entry.observacao}</p>
+      )}
+
+      {/* Error */}
+      {entry.erro && (
+        <p className="mt-3 text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{entry.erro}</p>
+      )}
     </div>
   )
 }
