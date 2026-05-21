@@ -269,7 +269,7 @@ export default function Dashboard() {
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2.5">
             <div className="logo-mark w-6 h-6" />
-            <span className="font-semibold text-sm tracking-tight">Biopark</span>
+            <span className="font-semibold text-sm tracking-tight">Prati</span>
             <span className="hidden sm:inline text-[10px] font-mono px-1.5 py-0.5 rounded bg-paper text-muted uppercase tracking-wider">Pro</span>
           </div>
           <nav className="hidden sm:flex items-center gap-1 text-sm">

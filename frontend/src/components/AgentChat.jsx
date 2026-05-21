@@ -5,7 +5,7 @@ import api from '../services/api'
 export default function AgentChat() {
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'Olá! Sou o assistente Biopark. Posso te ajudar a consultar protocolos, verificar status e muito mais. Como posso ajudar?' }
+    { role: 'assistant', content: 'Olá! Sou o assistente PratiFacil. Posso te ajudar a consultar protocolos, verificar status e muito mais. Como posso ajudar?' }
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -59,7 +59,7 @@ export default function AgentChat() {
       <button
         onClick={() => setOpen(v => !v)}
         className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-ink text-lime shadow-pop flex items-center justify-center hover:bg-ink-2 transition-all"
-        title="Assistente Biopark"
+        title="Assistente PratiFacil"
       >
         {open ? <X size={20} /> : <MessageCircle size={22} />}
       </button>
@@ -74,7 +74,7 @@ export default function AgentChat() {
               <Bot size={16} className="text-lime" />
             </div>
             <div>
-              <p className="text-sm font-semibold">Assistente Biopark</p>
+              <p className="text-sm font-semibold">Assistente PratiFacil</p>
               <p className="text-[11px] text-white/60">Powered by GPT-4o mini</p>
             </div>
             <button onClick={() => setOpen(false)} className="ml-auto text-white/60 hover:text-white transition">

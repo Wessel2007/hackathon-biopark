@@ -39,7 +39,7 @@ export default function ReportsLogin() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="logo-mark w-7 h-7" />
-            <span className="font-semibold tracking-tight">Biopark <span className="text-muted font-normal">/ Relatórios</span></span>
+            <span className="font-semibold tracking-tight">Prati <span className="text-muted font-normal">/ Relatórios</span></span>
           </div>
           <div className="hidden sm:inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-[11px] bg-paper text-muted">
             <span className="dot bg-accent-green" />
@@ -64,7 +64,7 @@ export default function ReportsLogin() {
               <input
                 type="email"
                 required
-                placeholder="voce@biopark.com.br"
+                placeholder="voce@prati.com.br"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl text-sm bg-paper border border-line-2 outline-none transition focus:ring-2 focus:ring-ink/10 focus:border-ink/30"
@@ -134,7 +134,7 @@ export default function ReportsLogin() {
         </div>
 
         <div className="flex items-center justify-between text-[11px] text-muted-faint">
-          <span>© {new Date().getFullYear()} Biopark · Relatórios</span>
+          <span>© {new Date().getFullYear()} Prati · Relatórios</span>
           <div className="hidden sm:flex gap-4">
             <span>Termos</span><span>Privacidade</span><span>Status</span>
           </div>
@@ -168,7 +168,7 @@ export default function ReportsLogin() {
               <span className="w-2.5 h-2.5 rounded-full bg-accent-amber/70" />
               <span className="w-2.5 h-2.5 rounded-full bg-accent-green/70" />
             </div>
-            <div className="font-mono text-[10px] text-muted">biopark.app / relatórios</div>
+            <div className="font-mono text-[10px] text-muted">prati.app / relatórios</div>
             <div className="w-12" />
           </div>
 
