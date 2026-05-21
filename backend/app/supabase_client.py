@@ -58,6 +58,11 @@ class SupabaseTable:
         c._params[col] = f"eq.{val}"
         return c
 
+    def in_(self, col: str, vals: list):
+        c = self._clone()
+        c._params[col] = f"in.({','.join(str(v) for v in vals)})"
+        return c
+
     def ilike(self, col: str, pattern: str):
         c = self._clone()
         c._params[col] = f"ilike.{pattern}"
