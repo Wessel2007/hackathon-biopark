@@ -17,6 +17,11 @@ export default function ReportsLogin() {
     setError('')
     try {
       const { access_token } = await login(email, password)
+      const payload = JSON.parse(atob(access_token.split('.')[1]))
+      if (payload.cargo !== 'admin') {
+        setError('Acesso restrito a administradores')
+        return
+      }
       localStorage.setItem('reports_token', access_token)
       navigate('/reports')
     } catch {
