@@ -1,4 +1,4 @@
-# Biopark — Desafio 4: Consulta de Protocolos
+# Prati — Desafio 4: Consulta de Protocolos
 
 Plataforma web para **cadastro, acompanhamento e consulta automatizada** de protocolos em órgãos públicos, com dashboard, histórico de movimentações, evidências (screenshot), relatórios em PDF e assistente com IA.
 
@@ -145,12 +145,12 @@ Planilhas modelo em `Planilhas/`. Use **Importar planilha** no sistema ou o scri
 
 ## Acesso (demonstração)
 
-Usuários ficam na tabela `usuarios` do Supabase. Para ambiente de demonstração, o `.env.example` sugere:
+Usuários ficam na tabela `usuarios` do Supabase. Credenciais para avaliação:
 
-| Campo | Exemplo |
-|-------|---------|
-| E-mail | `admin@biopark.com.br` |
-| Senha | conforme `DASHBOARD_PASSWORD` no `.env` |
+| Campo | Valor |
+|-------|-------|
+| E-mail | `aquilaaws@gmail.com` |
+| Senha | `1` |
 
 A área **Relatórios** (`/reports`) exige cargo `admin` e segundo login em `/reports-login`.
 

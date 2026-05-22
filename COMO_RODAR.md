@@ -60,14 +60,14 @@ npm run dev
 
 ## Login
 
-Configure `DASHBOARD_EMAIL` e `DASHBOARD_PASSWORD` em `backend/.env`, ou use um usuário cadastrado na tabela `usuarios` do Supabase.
+Os usuários são cadastrados na tabela `usuarios` do Supabase. Credenciais para avaliação:
 
-| Campo | Valor de exemplo (`.env.example`) |
-|-------|-----------------------------------|
-| E-mail | `admin@biopark.com.br` |
-| Senha | definida em `DASHBOARD_PASSWORD` |
+| Campo  | Valor |
+|--------|-------|
+| E-mail | `aquilaaws@gmail.com` |
+| Senha  | `1` |
 
-- **Dashboard** (`/`): token principal após login  
+- **Dashboard** (`/`): acesso geral após login
 - **Relatórios** (`/reports`): exige cargo `admin` + login em `/reports-login`
 
 ---
