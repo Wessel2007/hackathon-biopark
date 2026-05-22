@@ -88,6 +88,39 @@ Com o backend rodando e usuário autenticado, use **Baixar PDF** no Dashboard ou
 
 ---
 
+## Variáveis obrigatórias para a plataforma rodar 100%
+
+O arquivo `backend/.env` **não está no repositório** (por segurança). Você precisa criá-lo manualmente a partir do `backend/.env.example` e preencher os seguintes campos:
+
+| Variável | O que é | Onde obter |
+|----------|---------|------------|
+| `SUPABASE_URL` | URL do projeto Supabase | Supabase → Project Settings → API |
+| `SUPABASE_ANON_KEY` | Chave pública do Supabase | Supabase → Project Settings → API |
+| `SUPABASE_SERVICE_KEY` | Chave de serviço do Supabase | Supabase → Project Settings → API |
+| `SECRET_KEY` | Chave para assinar os tokens JWT | Qualquer string longa e aleatória |
+| `OPENAI_API_KEY` | Chave da OpenAI para o assistente IA | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) |
+
+> **Sem essas variáveis o backend não inicia.** As variáveis de SMTP (`SMTP_HOST`, `SMTP_USER`, etc.) são opcionais — apenas necessárias para notificações por e-mail.
+
+Exemplo de `backend/.env` mínimo:
+
+```env
+SECRET_KEY=qualquer-chave-secreta-forte
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=480
+
+DASHBOARD_EMAIL=seu@email.com
+DASHBOARD_PASSWORD=sua-senha
+
+SUPABASE_URL=https://SEU_PROJECT.supabase.co
+SUPABASE_ANON_KEY=sua-anon-key
+SUPABASE_SERVICE_KEY=sua-service-role-key
+
+OPENAI_API_KEY=sk-proj-...
+```
+
+---
+
 ## Problemas comuns
 
 | Sintoma | Solução |
@@ -95,3 +128,4 @@ Com o backend rodando e usuário autenticado, use **Baixar PDF** no Dashboard ou
 | Consulta real falha com erro de Playwright | Rode `python -m playwright install chromium` dentro de `backend/` (ou `npm run setup` na raiz) |
 | Front não conecta na API | Confira `VITE_API_URL` em `frontend/.env` |
 | Login recusado | Verifique Supabase, schema (`supabase_schema.sql`) e usuário/senha no `.env` |
+| Assistente IA retorna erro | Verifique se `OPENAI_API_KEY` está preenchida e válida no `backend/.env` |
