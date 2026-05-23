@@ -75,7 +75,7 @@ export default function AgentChat() {
             </div>
             <div>
               <p className="text-sm font-semibold">Assistente PratiFacil</p>
-              <p className="text-[11px] text-white/60">Powered by GPT-4o mini</p>
+              <p className="text-[11px] text-white/60">Powered by Ollama · Llama 3.2 3B</p>
             </div>
             <button onClick={() => setOpen(false)} className="ml-auto text-white/60 hover:text-white transition">
               <X size={16} />

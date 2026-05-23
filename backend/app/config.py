@@ -13,7 +13,9 @@ class Settings(BaseSettings):
     supabase_anon_key: str
     supabase_service_key: str
 
-    openai_api_key: str = ""
+    # Ollama (LLM local)
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_model: str = "llama3.2:3b"
 
     smtp_host: str = ""
     smtp_port: int = 587
