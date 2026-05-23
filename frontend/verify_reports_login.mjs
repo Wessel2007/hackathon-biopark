@@ -3,8 +3,8 @@ import path from 'path';
 import os from 'os';
 
 const BASE = 'http://localhost:5173';
-const EMAIL = 'aquilaaws@gmail.com';
-const PASS  = 'biopark2025';
+const EMAIL = 'admin@prati.com.br';
+const PASS  = '123456';
 const SS    = (name) => path.join(os.tmpdir(), `verify_${name}.png`);
 
 async function run() {
