@@ -13,7 +13,7 @@ Desenvolvida no contexto do **Hackathon Biopark** (Desafio 4).
 - **Histórico**: cada consulta grava status, observação, `fonte_consulta`, mudanças detectadas e screenshot quando disponível
 - **Dashboard**: visão consolidada, notificações e comparação real vs. simulado
 - **Relatórios**: PDF analítico e área restrita a administradores
-- **Assistente IA**: chat para consultas em linguagem natural (requer `OPENAI_API_KEY`)
+- **Assistente IA**: chat para consultas em linguagem natural via [Ollama](https://ollama.com) (LLM local, ex.: Llama 3.2 3B)
 - **Alertas por e-mail** (opcional, via SMTP)
 
 ---
@@ -25,6 +25,7 @@ Desenvolvida no contexto do **Hackathon Biopark** (Desafio 4).
 | API | Python 3.10+, FastAPI | [Railway](https://railway.app) (`backend/`) |
 | Banco | Supabase (PostgreSQL) | [Supabase](https://supabase.com) |
 | Front | React, Vite, Tailwind | [Vercel](https://vercel.com) (`frontend/`) |
+| IA (chat) | Ollama + Llama 3.2 3B | Local ou servidor com Ollama exposto |
 
 ---
 
@@ -91,17 +92,42 @@ Isso instala dependências (Node + Python), cria `.env` a partir dos exemplos se
 
 | Arquivo | Variáveis |
 |---------|-----------|
-| `backend/.env` | Copie de `backend/.env.example` — Supabase, JWT, login, OpenAI e SMTP (opcionais) |
+| `backend/.env` | Copie de `backend/.env.example` — Supabase, JWT, login, Ollama e SMTP (opcionais) |
 | `frontend/.env` | `VITE_API_URL=http://localhost:8000` |
 
 **Importante:** arquivos `.env` não são versionados. Configure credenciais apenas no ambiente local ou no painel do Railway/Vercel.
+
+### Assistente IA (Ollama)
+
+O chat usa um modelo local via Ollama — não é necessária chave de API paga.
+
+1. Instale o [Ollama](https://ollama.com) e deixe o serviço rodando.
+2. Baixe o modelo padrão do projeto:
+
+```bash
+ollama pull llama3.2:3b
+```
+
+3. No `backend/.env`, confira (valores padrão do `.env.example`):
+
+```env
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=llama3.2:3b
+```
+
+Em deploy na nuvem (Railway), o assistente só funciona se houver uma instância Ollama acessível pela API e `OLLAMA_BASE_URL` apontando para ela. Para demonstração local, basta Ollama na máquina onde o backend roda.
 
 ### Banco de dados
 
 1. Crie um projeto no Supabase.
 2. Execute `backend/supabase_schema.sql` no SQL Editor.
 3. Aplique migrações adicionais em `backend/migration_*.sql`, se necessário.
-4. Cadastre usuários na tabela `usuarios` ou use as credenciais de `DASHBOARD_*` no `.env`.
+4. Cadastre o usuário de demonstração na tabela `usuarios` (o login usa essa tabela, não o `.env`):
+
+```sql
+INSERT INTO usuarios (email, senha_hash, cargo)
+VALUES ('admin@prati.com.br', '123456', 'admin');
+```
 
 ### Carga inicial
 
@@ -114,8 +140,9 @@ Planilhas modelo em `Planilhas/`. Use **Importar planilha** no sistema ou o scri
 ### Backend (Railway)
 
 1. Novo projeto apontando para `backend/`
-2. Variáveis do `.env.example`
+2. Variáveis do `.env.example` (Supabase, JWT, etc.)
 3. `nixpacks.toml` já instala dependências e `playwright install chromium`
+4. **Assistente IA:** configure `OLLAMA_BASE_URL` para um host Ollama acessível pelo container, ou use o chat apenas em ambiente local
 
 ### Frontend (Vercel)
 
@@ -149,8 +176,9 @@ Usuários ficam na tabela `usuarios` do Supabase. Credenciais para avaliação:
 
 | Campo | Valor |
 |-------|-------|
-| E-mail | `aquilaaws@gmail.com` |
-| Senha | `1` |
+| E-mail | `admin@prati.com.br` |
+| Senha | `123456` |
+| Cargo | `admin` (necessário para Relatórios) |
 
 A área **Relatórios** (`/reports`) exige cargo `admin` e segundo login em `/reports-login`.
 

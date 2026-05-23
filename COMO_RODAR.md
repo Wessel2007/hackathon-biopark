@@ -64,8 +64,16 @@ Os usuários são cadastrados na tabela `usuarios` do Supabase. Credenciais para
 
 | Campo  | Valor |
 |--------|-------|
-| E-mail | `aquilaaws@gmail.com` |
-| Senha  | `1` |
+| E-mail | `admin@prati.com.br` |
+| Senha  | `123456` |
+| Cargo  | `admin` (para acessar Relatórios) |
+
+Se o login falhar, insira o usuário no Supabase (SQL Editor):
+
+```sql
+INSERT INTO usuarios (email, senha_hash, cargo)
+VALUES ('admin@prati.com.br', '123456', 'admin');
+```
 
 - **Dashboard** (`/`): acesso geral após login
 - **Relatórios** (`/reports`): exige cargo `admin` + login em `/reports-login`
