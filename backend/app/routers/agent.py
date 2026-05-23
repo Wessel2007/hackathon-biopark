@@ -1,8 +1,8 @@
 import json
 from typing import List
 
+import ollama as ollama_lib
 from fastapi import APIRouter, Depends
-from openai import OpenAI
 from pydantic import BaseModel
 
 from app.config import settings
@@ -264,34 +264,32 @@ def chat(
     sb: SupabaseClient = Depends(get_supabase),
     current_user: str = Depends(get_current_user),
 ):
-    client = OpenAI(api_key=settings.openai_api_key)
+    client = ollama_lib.Client(host=settings.ollama_base_url)
 
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     messages += [{"role": m.role, "content": m.content} for m in body.messages]
 
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
+    response = client.chat(
+        model=settings.ollama_model,
         messages=messages,
         tools=TOOLS,
-        tool_choice="auto",
     )
 
-    msg = response.choices[0].message
+    msg = response.message
 
     if msg.tool_calls:
         messages.append(msg)
         for tc in msg.tool_calls:
-            result = _run_tool(tc.function.name, json.loads(tc.function.arguments), sb, current_user)
+            # tc.function.arguments já é um dict na biblioteca ollama
+            result = _run_tool(tc.function.name, tc.function.arguments, sb, current_user)
             messages.append({
                 "role": "tool",
-                "tool_call_id": tc.id,
                 "content": json.dumps(result, ensure_ascii=False, default=str),
             })
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
+        response = client.chat(
+            model=settings.ollama_model,
             messages=messages,
-            tools=TOOLS,
         )
-        msg = response.choices[0].message
+        msg = response.message
 
     return {"reply": msg.content}
